@@ -119,7 +119,7 @@ pub async fn list_jobs(
     // Create a new table
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-    table.add_row(row![
+    table.set_titles(row![
         "ID",
         "Status",
         "Reason",
