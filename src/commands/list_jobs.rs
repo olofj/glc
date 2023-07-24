@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use crate::commands::credentials::Credentials;
 use crate::commands::job::Job;
 
-fn format_bytes(bytes: usize) -> String {
+fn format_bytes(bytes: usize) -> ColoredString {
     let bytes = bytes as f64;
     let kilobytes = bytes / 1024f64;
     let megabytes = kilobytes / 1024f64;
@@ -15,15 +15,19 @@ fn format_bytes(bytes: usize) -> String {
     let terabytes = gigabytes / 1024f64;
 
     if terabytes >= 1f64 {
-        format!("{:.2} TB", terabytes)
+        format!("{:6.2} TB", terabytes).bright_red()
     } else if gigabytes >= 1f64 {
-        format!("{:.2} GB", gigabytes)
+        format!("{:6.2} GB", gigabytes).bright_red()
+    } else if megabytes >= 200f64 {
+        format!("{:6.1} MB", megabytes).yellow()
     } else if megabytes >= 1f64 {
-        format!("{:.1} MB", megabytes)
+        format!("{:6.1} MB", megabytes).normal()
     } else if kilobytes >= 1f64 {
-        format!("{:.1} KB", kilobytes)
+        format!("{:6.1} KB", kilobytes).normal()
+    } else if bytes >= 1f64 {
+        format!("{:6.1} B", bytes).normal()
     } else {
-        format!("{:.1} B", bytes)
+        format!("{:>6}", "-").normal()
     }
 }
 
@@ -79,9 +83,7 @@ async fn get_jobs(
             .get(LINK)
             .ok_or("Missing Link header")?
             .to_str()?;
-        //        println!("Link header: {}", link_header);
         next_url = parse_next_page(link_header);
-        //        println!("next_url: {}", next_url.ok_or("none")?);
 
         let mut jobs_page: Vec<Job> = response.json().await?;
         jobs.append(&mut jobs_page);
@@ -144,7 +146,7 @@ pub async fn list_jobs(
             &status,
             &job.failure_reason.unwrap_or_default(),
             &job.stage,
-            &format_bytes(artifact_size).as_str(),
+            &format_bytes(artifact_size),
             &job.name,
             &format_seconds(job.duration.unwrap_or_default()).as_str(),
         ]);
