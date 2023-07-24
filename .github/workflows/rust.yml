@@ -1,0 +1,45 @@
+name: Rust
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy  # Add this line
+    - name: Run rustfmt
+      uses: actions-rs/cargo@v1
+      with:
+        command: fmt
+        args: -- --check
+    - name: Run clippy
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
+        args: -- -D warnings
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --all --verbose
+    - name: Run tests
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --all --verbose
+
