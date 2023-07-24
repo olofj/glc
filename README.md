@@ -28,6 +28,10 @@ cargo run list-pipelines
 ```
 ... etc
 
+To get started and configure tokens:
+```
+cargo run login --token <token from web ui> --url <server url>
+```
 
 ## TODO
 
