@@ -33,6 +33,18 @@ To get started and configure tokens:
 cargo run login --token <token from web ui> --url <server url>
 ```
 
+The API needs the project specified, and it can be sort of random
+which one you end up needing -- it's certainly not necessarily a low
+number. It's available to pass in with `-P <id>` on the commands, but
+what I've done is that I just set the envornment variable:
+
+```
+export GITLAB_PROJECT=123
+```
+
+Note: `list-projects` isn't working at this time, hasn't been a priority
+to fix
+
 ## TODO
 
 I haven't used structopts much, and I haven't been able to get it to
