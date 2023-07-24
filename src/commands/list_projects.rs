@@ -1,5 +1,5 @@
 use colored::*;
-use prettytable::{format, Cell, Row, Table};
+use prettytable::{format, row, Table};
 use reqwest::Url;
 
 use crate::commands::credentials::Credentials;
@@ -17,6 +17,7 @@ pub async fn list_projects(creds: &Credentials) -> Result<(), Box<dyn std::error
     // Create a new table
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+    table.add_row(row!["ID", "Status", "Source", "ref"]);
 
     // Add a row per time
     for pipeline in pipelines {
@@ -26,12 +27,12 @@ pub async fn list_projects(creds: &Credentials) -> Result<(), Box<dyn std::error
             "running" => "⏳ Running".yellow(),
             _ => "❓ Unknown".normal(),
         };
-        table.add_row(Row::new(vec![
-            Cell::new(&pipeline.id.to_string()),
-            Cell::new(&status),
-            Cell::new(&pipeline.source),
-            Cell::new(&pipeline.rref),
-        ]));
+        table.add_row(row![
+            &pipeline.id.to_string(),
+            &status,
+            &pipeline.source,
+            &pipeline.rref,
+        ]);
     }
 
     // Print the table to stdout
