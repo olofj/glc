@@ -20,7 +20,7 @@ pub async fn list_pipelines(
     // Create a new table
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_LINESEP);
-    table.add_row(row!["ID", "Status", "Source", "Ref",]);
+    table.set_titles(row!["ID", "Status", "Source", "Ref"]);
 
     // Add a row per time
     for pipeline in pipelines {
