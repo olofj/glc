@@ -29,9 +29,9 @@ fn format_bytes(bytes: usize) -> String {
 
 fn format_seconds(sec: f64) -> String {
     let sec = sec as usize;
-    let minutes = sec / 60 as usize;
-    let hours = minutes / 60 as usize;
-    let days = hours / 24 as usize;
+    let minutes = sec / 60_usize;
+    let hours = minutes / 60_usize;
+    let days = hours / 24_usize;
 
     if days >= 1 {
         format!(

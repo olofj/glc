@@ -29,9 +29,9 @@ fn format_bytes(bytes: usize) -> String {
 
 fn format_seconds(sec: f64) -> String {
     let sec = sec as usize;
-    let minutes = sec / 60 as usize;
-    let hours = minutes / 60 as usize;
-    let days = hours / 24 as usize;
+    let minutes = sec / 60_usize;
+    let hours = minutes / 60_usize;
+    let days = hours / 24_usize;
 
     if days >= 1 {
         format!(
@@ -92,7 +92,7 @@ async fn get_jobs(
 
 fn parse_next_page(link_header: &str) -> Option<String> {
     let links: HashMap<String, String> = link_header
-        .split(",")
+        .split(',')
         .map(|line| {
             let re = Regex::new(r#"<([^>]*)>;\s*rel="([^"]*)""#).unwrap();
 
@@ -114,7 +114,7 @@ pub async fn list_jobs(
     project: &str,
     pipeline: Option<usize>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let jobs: Vec<Job> = get_jobs(&creds, project, pipeline).await?;
+    let jobs: Vec<Job> = get_jobs(creds, project, pipeline).await?;
 
     // Create a new table
     let mut table = Table::new();
