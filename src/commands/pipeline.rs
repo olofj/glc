@@ -24,7 +24,7 @@ pub struct Pipeline {
 }
 
 // Returns number of seconds since the rfc3339 timestamp
-fn seconds_ago(datetime: &String) -> Duration {
+fn seconds_ago(datetime: &str) -> Duration {
     let timestamp: chrono::DateTime<Utc> = DateTime::parse_from_rfc3339(datetime)
         .expect("Failed to parse timestamp")
         .into();
@@ -70,21 +70,12 @@ pub async fn get_pipelines(
             .map(|p| seconds_ago(p.created_at.as_ref().unwrap()))
             .max()
             .unwrap();
-        pipelines_page = pipelines_page
-            .into_iter()
-            .filter(|p| seconds_ago(p.created_at.as_ref().unwrap()) <= max_age)
-            .collect();
+        pipelines_page.retain(|p| seconds_ago(p.created_at.as_ref().unwrap()) <= max_age);
         if let Some(src) = source.clone() {
-            pipelines_page = pipelines_page
-                .into_iter()
-                .filter(|p| p.source == src)
-                .collect();
+            pipelines_page.retain(|p| p.source == src);
         }
         if let Some(rref) = rref.clone() {
-            pipelines_page = pipelines_page
-                .into_iter()
-                .filter(|p| p.rref == rref)
-                .collect();
+            pipelines_page.retain(|p| p.rref == rref);
         }
         if res_max_age > max_age {
             next_url = None;

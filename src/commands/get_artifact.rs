@@ -48,7 +48,7 @@ pub async fn get_artifact(
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
 
-    match archive.by_name(&artifact.as_str()) {
+    match archive.by_name(artifact.as_str()) {
         Err(ZipError::FileNotFound) => {
             println!("File {} not found. Available files:", artifact);
             for f in names {

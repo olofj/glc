@@ -74,7 +74,7 @@ async fn get_jobs(
     let mut count = 10;
 
     while let Some(url) = next_url {
-        count = count - 1;
+        count -= 1;
         let response = client
             .get(url)
             .bearer_auth(&credentials.token)

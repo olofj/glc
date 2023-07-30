@@ -13,7 +13,7 @@ use crate::commands::job::Job;
 use crate::commands::pipeline::get_pipelines;
 
 // Returns number of seconds since the rfc3339 timestamp
-fn seconds_ago(datetime: &String) -> Duration {
+fn seconds_ago(datetime: &str) -> Duration {
     let timestamp: chrono::DateTime<Utc> = DateTime::parse_from_rfc3339(datetime)
         .expect("Failed to parse timestamp")
         .into();
@@ -76,7 +76,7 @@ async fn find_jobs(
     job_name: &str,
     max_age: Duration,
 ) -> Result<Vec<Job>, Box<dyn std::error::Error>> {
-    let max_age = if pipelines != None {
+    let max_age = if pipelines.is_some() {
         Duration::from_secs(std::u64::MAX)
     } else {
         max_age
@@ -125,7 +125,7 @@ async fn find_jobs(
             .iter()
             .map(|j| match &j.created_at {
                 None => Duration::new(0, 0),
-                Some(c) => seconds_ago(&c),
+                Some(c) => seconds_ago(c),
             })
             .max()
             .unwrap_or(Duration::new(0, 0));
