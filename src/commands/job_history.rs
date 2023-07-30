@@ -147,6 +147,7 @@ pub async fn job_history(
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
     table.set_titles(row![
         "ID",
+        "Pipeline",
         "Status",
         "Reason",
         "Artifacts",
@@ -169,6 +170,7 @@ pub async fn job_history(
         let artifact_size = job.artifacts.into_iter().map(|a| a.size).sum();
         table.add_row(Row::new(vec![
             Cell::new(&job.id.to_string()),
+            Cell::new(&job.pipeline.id),
             Cell::new(&status),
             Cell::new(&job.failure_reason.unwrap_or_default()),
             Cell::new(&format_bytes(artifact_size)),
