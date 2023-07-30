@@ -17,6 +17,7 @@ pub struct Pipeline {
     #[serde(rename = "ref")]
     pub rref: String,
     pub status: String,
+    pub sha: String,
     pub source: String,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
@@ -50,8 +51,14 @@ pub async fn get_pipelines(
     let mut next_url: Option<String> = Some(url.to_string());
     let mut stdout = io::stdout();
 
+    println!(
+        "Searching for pipelines matching Ref: {} Source: {}",
+        rref.as_ref().unwrap_or(&"any".to_string()),
+        source.as_ref().unwrap_or(&"any".to_string())
+    );
     print!("Pipelines: ");
     stdout.flush().unwrap();
+
     while let Some(url) = next_url {
         let response = client.get(url).bearer_auth(&creds.token).send().await?;
         let link_header = response
@@ -82,7 +89,7 @@ pub async fn get_pipelines(
         }
         pipelines.append(&mut pipelines_page);
     }
-    println!(" {} matched\n", pipelines.len());
+    println!(" {} matched", pipelines.len());
 
     Ok(pipelines)
 }
@@ -102,6 +109,5 @@ fn parse_next_page(link_header: &str) -> Option<String> {
                 .unwrap()
         })
         .collect();
-    //    println!("links: {:?}", links);
     links.get("next").cloned()
 }

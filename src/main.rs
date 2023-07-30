@@ -13,6 +13,7 @@ mod commands {
     pub mod pipeline;
     pub mod show_job;
 }
+mod format;
 
 use commands::credentials::load_credentials;
 use commands::get_artifact::get_artifact;

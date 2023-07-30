@@ -4,13 +4,14 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use colored::*;
-use prettytable::{format, row, Table};
+use prettytable::{format, row, Cell, Row, Table};
 use regex::Regex;
 use reqwest::header::LINK;
 
 use crate::commands::credentials::Credentials;
 use crate::commands::job::Job;
 use crate::commands::pipeline::get_pipelines;
+use crate::format::{format_bytes, format_seconds};
 
 // Returns number of seconds since the rfc3339 timestamp
 fn seconds_ago(datetime: &str) -> Duration {
@@ -20,53 +21,6 @@ fn seconds_ago(datetime: &str) -> Duration {
     let now = Utc::now();
 
     (now - timestamp).to_std().unwrap()
-}
-
-fn format_bytes(bytes: usize) -> ColoredString {
-    let bytes = bytes as f64;
-    let kilobytes = bytes / 1024f64;
-    let megabytes = kilobytes / 1024f64;
-    let gigabytes = megabytes / 1024f64;
-    let terabytes = gigabytes / 1024f64;
-
-    if terabytes >= 1f64 {
-        format!("{:6.2} TB", terabytes).bright_red()
-    } else if gigabytes >= 1f64 {
-        format!("{:6.2} GB", gigabytes).bright_red()
-    } else if megabytes >= 200f64 {
-        format!("{:6.1} MB", megabytes).yellow()
-    } else if megabytes >= 1f64 {
-        format!("{:6.1} MB", megabytes).normal()
-    } else if kilobytes >= 1f64 {
-        format!("{:6.1} KB", kilobytes).normal()
-    } else if bytes >= 1f64 {
-        format!("{:6.1} B", bytes).normal()
-    } else {
-        format!("{:>6}", "-").normal()
-    }
-}
-
-fn format_seconds(sec: f64) -> String {
-    let sec = sec as usize;
-    let minutes = sec / 60_usize;
-    let hours = minutes / 60_usize;
-    let days = hours / 24_usize;
-
-    if days >= 1 {
-        format!(
-            "{:.0}d {:.0}h:{:.0}m.{:.0}s",
-            days,
-            hours % 24,
-            minutes % 60,
-            sec % 60
-        )
-    } else if hours >= 1 {
-        format!("{:.0}h:{:.0}m.{:.0}s", hours, minutes % 60, sec % 60)
-    } else if minutes >= 1 {
-        format!("{:.0}m.{:.1}s", minutes, sec % 60)
-    } else {
-        format!("{:.2}s", sec)
-    }
 }
 
 async fn find_jobs(
@@ -197,7 +151,8 @@ pub async fn job_history(
         "Reason",
         "Artifacts",
         "Ref",
-        //        "Source",
+        "SHA",
+        "Source",
         "Created",
         "Duration",
     ]);
@@ -212,16 +167,17 @@ pub async fn job_history(
             stat => format!("❓\u{00a0} {stat}").normal(),
         };
         let artifact_size = job.artifacts.into_iter().map(|a| a.size).sum();
-        table.add_row(row![
-            &job.id.to_string(),
-            &status,
-            &job.failure_reason.unwrap_or_default(),
-            &format_bytes(artifact_size),
-            &job.rref,
-            //        &job.pipeline.source;
-            &job.created_at.unwrap_or_default(),
-            &format_seconds(job.duration.unwrap_or_default()).as_str(),
-        ]);
+        table.add_row(Row::new(vec![
+            Cell::new(&job.id.to_string()),
+            Cell::new(&status),
+            Cell::new(&job.failure_reason.unwrap_or_default()),
+            Cell::new(&format_bytes(artifact_size)),
+            Cell::new(&job.rref),
+            Cell::new(&job.pipeline.sha[0..14]),
+            Cell::new(&job.pipeline.source),
+            Cell::new(&job.created_at.unwrap_or_default()),
+            Cell::new(format_seconds(job.duration.unwrap_or_default()).as_str()),
+        ]));
     }
 
     // Print the table to stdout
