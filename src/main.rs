@@ -3,6 +3,7 @@ use structopt::StructOpt;
 
 mod commands {
     pub mod credentials;
+    pub mod get_artifact;
     pub mod job;
     pub mod job_history;
     pub mod list_jobs;
@@ -14,6 +15,7 @@ mod commands {
 }
 
 use commands::credentials::load_credentials;
+use commands::get_artifact::get_artifact;
 use commands::job_history::job_history;
 use commands::list_jobs::list_jobs;
 use commands::list_pipelines::list_pipelines;
@@ -72,6 +74,16 @@ enum Command {
         #[structopt()]
         tail: Option<isize>,
     },
+    /// Get artifact from job
+    #[structopt(name = "get-artifact")]
+    GetArtifact {
+        /// Job ID to download from
+        #[structopt(short = "j", long = "job")]
+        job: usize,
+        /// Artifact name
+        #[structopt(short = "n", long = "name")]
+        name: String,
+    },
     /// Show historical results for a job (by name)
     #[structopt(name = "job-history")]
     JobHistory {
@@ -124,6 +136,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tail,
         } => {
             show_job(&creds, &project, job, status, follow, tail).await?;
+        }
+        Command::GetArtifact { job, name } => {
+            get_artifact(&creds, &project, job, name).await?;
         }
         Command::JobHistory {
             name,
