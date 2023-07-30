@@ -1,21 +1,20 @@
+use std::time::Duration;
+
 use colored::*;
 use prettytable::{format, row, Table};
-use reqwest::Url;
 
 use crate::commands::credentials::Credentials;
-use crate::commands::pipeline::Pipeline;
+use crate::commands::pipeline::get_pipelines;
 
 pub async fn list_pipelines(
     creds: &Credentials,
     project: &str,
+    max_age: Option<Duration>,
+    source: Option<String>,
+    rref: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let url = format!("{}/api/v4/projects/{}/pipelines", creds.url, project);
-    let url = Url::parse(&url)?;
-
-    let client = reqwest::Client::new();
-    let response = client.get(url).bearer_auth(&creds.token).send().await?;
-
-    let pipelines: Vec<Pipeline> = response.json().await?;
+    let max_age = max_age.unwrap_or(Duration::from_secs(86400));
+    let pipelines = get_pipelines(creds, project, max_age, source, rref).await?;
 
     // Create a new table
     let mut table = Table::new();

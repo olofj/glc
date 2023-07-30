@@ -1,8 +1,10 @@
+use parse_duration::parse;
 use structopt::StructOpt;
 
 mod commands {
     pub mod credentials;
     pub mod job;
+    pub mod job_history;
     pub mod list_jobs;
     pub mod list_pipelines;
     pub mod list_projects;
@@ -12,6 +14,7 @@ mod commands {
 }
 
 use commands::credentials::load_credentials;
+use commands::job_history::job_history;
 use commands::list_jobs::list_jobs;
 use commands::list_pipelines::list_pipelines;
 use commands::list_projects::list_projects;
@@ -69,9 +72,35 @@ enum Command {
         #[structopt()]
         tail: Option<isize>,
     },
+    /// Show historical results for a job (by name)
+    #[structopt(name = "job-history")]
+    JobHistory {
+        /// Job name
+        #[structopt(short = "n", long = "name")]
+        name: String,
+        /// Max history ("1h", "10m", "4d" etc)
+        #[structopt(short = "m", long = "max-age")]
+        max_age: Option<String>,
+        /// Source (type of pipeline)
+        #[structopt(short = "s", long = "source")]
+        source: Option<String>,
+        /// Reference (branch)
+        #[structopt(short = "r", long = "ref")]
+        rref: Option<String>,
+    },
     /// List pipelines
     #[structopt(name = "list-pipelines")]
-    ListPipelines {},
+    ListPipelines {
+        /// Max history ("1h", "10m", "4d" etc)
+        #[structopt(short = "m", long = "max-age")]
+        max_age: Option<String>,
+        /// Source (type of pipeline)
+        #[structopt(short = "s", long = "source")]
+        source: Option<String>,
+        /// Reference (branch)
+        #[structopt(short = "r", long = "ref")]
+        rref: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -79,13 +108,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
     let project = opt.project.unwrap_or_default();
+    let creds = load_credentials()?;
 
     match opt.cmd {
         Command::Login { token, url } => {
             login(&token, &url)?;
         }
         Command::ListJobs { pipeline } => {
-            let creds = load_credentials()?;
             list_jobs(&creds, &project, pipeline).await?;
         }
         Command::ShowJob {
@@ -94,16 +123,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             follow,
             tail,
         } => {
-            let creds = load_credentials()?;
             show_job(&creds, &project, job, status, follow, tail).await?;
         }
+        Command::JobHistory {
+            name,
+            max_age,
+            source,
+            rref,
+        } => {
+            let max_age = match max_age {
+                None => None,
+                Some(a) => parse(&a).ok(),
+            };
+            job_history(&creds, &project, &name, max_age, source, rref).await?;
+        }
         Command::ListProjects {} => {
-            let creds = load_credentials()?;
             list_projects(&creds).await?;
         }
-        Command::ListPipelines {} => {
-            let creds = load_credentials()?;
-            list_pipelines(&creds, &project).await?;
+        Command::ListPipelines {
+            max_age,
+            source,
+            rref,
+        } => {
+            let max_age = match max_age {
+                None => None,
+                Some(a) => parse(&a).ok(),
+            };
+            list_pipelines(&creds, &project, max_age, source, rref).await?;
         }
     }
 

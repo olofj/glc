@@ -1,11 +1,12 @@
-use crate::commands::credentials::Credentials;
-use anyhow::Result;
-use reqwest::Url;
 use std::sync::Arc;
+
+use anyhow::Result;
+use prettytable::{format, row, table, Table};
+use reqwest::Url;
 use tokio::task; // for task::spawn
 
-use crate::commands::job::Job;
-use prettytable::{format, table};
+use crate::commands::credentials::Credentials;
+use crate::commands::job::get_job_details;
 
 fn format_bytes(bytes: usize) -> String {
     let bytes = bytes as f64;
@@ -15,15 +16,15 @@ fn format_bytes(bytes: usize) -> String {
     let terabytes = gigabytes / 1024f64;
 
     if terabytes >= 1f64 {
-        format!("{:.2} TB", terabytes)
+        format!("{:.1} TB", terabytes)
     } else if gigabytes >= 1f64 {
-        format!("{:.2} GB", gigabytes)
+        format!("{:.1} GB", gigabytes)
     } else if megabytes >= 1f64 {
-        format!("{:.2} MB", megabytes)
+        format!("{:.1} MB", megabytes)
     } else if kilobytes >= 1f64 {
-        format!("{:.2} KB", kilobytes)
+        format!("{:.1} KB", kilobytes)
     } else {
-        format!("{:.2} B", bytes)
+        format!("{:} B", bytes)
     }
 }
 
@@ -83,24 +84,35 @@ pub async fn show_job(
     // Now job_details and job_logs are available, you can print them or process further
 
     if status {
-        let artifact_size = job_details.artifacts.into_iter().map(|a| a.size).sum();
+        let artifact_size = job_details.artifacts.iter().map(|a| a.size).sum();
+        let mut artifact_table = job_details
+            .artifacts
+            .into_iter()
+            .map(|a| row!(a.filename, format_bytes(a.size)))
+            .collect::<Table>();
+        artifact_table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+        artifact_table.set_titles(row!("filename", "size"));
 
         let mut table = table!(
             ["ID", job_details.id],
             ["Status", job_details.status],
             ["Stage", job_details.stage],
             ["Name", job_details.name],
-            ["Artifacts", format_bytes(artifact_size)],
+            ["Artifact size", format_bytes(artifact_size)],
+            ["Artifacts", artifact_table],
             ["Started at", job_details.started_at.unwrap_or_default()],
             ["Finished at", job_details.finished_at.unwrap_or_default()],
             [
                 "Duration",
                 &format_seconds(job_details.duration.unwrap_or_default())
-            ]
+            ],
+            ["", ""],
+            ["Ref", job_details.pipeline.rref],
+            ["Source", job_details.pipeline.source],
+            ["Pipeline URL", job_details.pipeline.web_url]
         );
 
         table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
-
         table.printstd();
     }
 
@@ -128,32 +140,4 @@ async fn get_job_logs(
     let logs = response.text().await?;
 
     Ok(logs)
-}
-
-async fn get_job_details(
-    credentials: Arc<Credentials>,
-    project: String,
-    job_id: usize,
-) -> Result<Job> {
-    let url = format!(
-        "{}/api/v4/projects/{}/jobs/{}",
-        credentials.url, project, job_id
-    );
-    let _url_save = url.clone();
-    let url = Url::parse(&url)?;
-
-    let client = reqwest::Client::new();
-    let response = client
-        .get(url)
-        .bearer_auth(&credentials.token)
-        .send()
-        .await?;
-
-    let response_text = response.text().await?;
-    //    println!("URL was: {:?}", _url_save);
-    //    println!("Server response: {}", response_text);
-
-    let job_details: Job = serde_json::from_str(&response_text)?;
-
-    Ok(job_details)
 }
