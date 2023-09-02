@@ -58,8 +58,8 @@ pub async fn show_job(
             ["Name", job_details.name],
             ["Artifact size", format_bytes(artifact_size)],
             ["Artifacts", artifact_table],
-            ["Started at", job_details.started_at.unwrap_or_default()],
-            ["Finished at", job_details.finished_at.unwrap_or_default()],
+            ["Started at", job_details.started_at],
+            ["Finished at", job_details.finished_at],
             [
                 "Duration",
                 &format_seconds(job_details.duration.unwrap_or_default())

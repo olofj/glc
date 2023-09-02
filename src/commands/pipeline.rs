@@ -10,7 +10,7 @@ use serde_derive::Deserialize;
 
 use crate::commands::credentials::Credentials;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Pipeline {
     pub id: u32,
     pub project_id: u32,
@@ -21,6 +21,7 @@ pub struct Pipeline {
     pub source: String,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
+    pub finished_at: Option<String>,
     pub web_url: String,
 }
 

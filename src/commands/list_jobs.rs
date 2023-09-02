@@ -5,6 +5,8 @@ use prettytable::{format, row, Table};
 use regex::Regex;
 use reqwest::header::LINK;
 
+use chrono::Utc;
+
 use crate::commands::credentials::Credentials;
 use crate::commands::job::Job;
 use crate::format::{format_bytes, format_seconds};
@@ -46,7 +48,14 @@ async fn get_jobs(
             next_url = None;
         }
 
-        let mut jobs_page: Vec<Job> = response.json().await?;
+        let response_text = response.text().await?;
+        let mut jobs_page: Vec<Job> = serde_json::from_str(&response_text).map_err(|e| {
+            format!(
+                "Failed to parse JSON: {}\nOriginal JSON: {}",
+                e, response_text
+            )
+        })?;
+        //let mut jobs_page: Vec<Job> = response.json().await?;
         jobs.append(&mut jobs_page);
     }
 
@@ -90,7 +99,18 @@ pub async fn list_jobs(
         "Artifacts",
         "Name",
         "Time",
+        "Tags",
+        "Execution time",
     ]);
+
+    // Normalize jobs based on oldest created_at
+    let min = jobs.iter().map(|job| job.created_at).min().unwrap();
+    let max = jobs
+        .iter()
+        .map(|job| job.finished_at)
+        .max()
+        .unwrap_or(Utc::now());
+    let scale = 30.0 / (max - min).num_seconds() as f64;
 
     // Add a row per time
     for job in jobs.into_iter().rev() {
@@ -102,6 +122,10 @@ pub async fn list_jobs(
             stat => format!("❓\u{00a0} {stat}").normal(),
         };
         let artifact_size = job.artifacts.into_iter().map(|a| a.size).sum();
+        let start_position = (job.started_at - min).num_seconds() as f64 * scale;
+        let start_position = start_position as usize;
+        let duration_width = (job.finished_at - job.started_at).num_seconds() as f64 * scale;
+        let duration_width = duration_width.max(1.0) as usize;
         table.add_row(row![
             &job.id.to_string(),
             &status,
@@ -110,6 +134,8 @@ pub async fn list_jobs(
             &format_bytes(artifact_size),
             &job.name,
             &format_seconds(job.duration.unwrap_or_default()).as_str(),
+            &job.tag_list.join(" "),
+            " ".repeat(start_position) + &"-".repeat(duration_width),
         ]);
     }
 

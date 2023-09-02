@@ -1,11 +1,12 @@
 use crate::commands::credentials::Credentials;
 use crate::commands::pipeline::Pipeline;
 use anyhow::Result;
+use chrono::{DateTime, TimeZone, Utc};
 use reqwest::Url;
 use serde_derive::Deserialize;
 use std::sync::Arc;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Artifact {
     pub file_type: String,
     pub size: usize,
@@ -13,7 +14,7 @@ pub struct Artifact {
     pub file_format: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Job {
     pub id: usize,
     pub status: String,
@@ -22,15 +23,27 @@ pub struct Job {
     #[serde(rename = "ref")]
     pub rref: String,
     pub tag: bool,
-    pub created_at: Option<String>,
-    pub started_at: Option<String>,
-    pub finished_at: Option<String>,
+    #[serde(deserialize_with = "parse_date")]
+    pub created_at: DateTime<Utc>,
+    #[serde(deserialize_with = "parse_date")]
+    pub started_at: DateTime<Utc>,
+    #[serde(deserialize_with = "parse_date")]
+    pub finished_at: DateTime<Utc>,
     pub duration: Option<f64>,
     pub queued_duration: Option<f64>,
     pub failure_reason: Option<String>,
     pub artifacts: Vec<Artifact>,
     pub pipeline: Pipeline,
+    pub tag_list: Vec<String>,
     // include other fields you are interested in
+}
+
+fn parse_date<'de, D>(d: D) -> Result<DateTime<Utc>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    serde::Deserialize::deserialize(d)
+        .map(|x: Option<_>| x.unwrap_or(Utc.timestamp_opt(0, 0).unwrap()))
 }
 
 pub async fn get_job_details(

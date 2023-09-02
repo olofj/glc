@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
+use chrono::Utc;
 use colored::*;
 use prettytable::{format, row, Cell, Row, Table};
 use regex::Regex;
@@ -14,13 +15,10 @@ use crate::commands::pipeline::get_pipelines;
 use crate::format::{format_bytes, format_seconds};
 
 // Returns number of seconds since the rfc3339 timestamp
-fn seconds_ago(datetime: &str) -> Duration {
-    let timestamp: chrono::DateTime<Utc> = DateTime::parse_from_rfc3339(datetime)
-        .expect("Failed to parse timestamp")
-        .into();
-    let now = Utc::now();
+fn seconds_ago(ndt: &NaiveDateTime) -> Duration {
+    let now = Utc::now().naive_utc();
 
-    (now - timestamp).to_std().unwrap()
+    (now - *ndt).to_std().unwrap()
 }
 
 async fn find_jobs(
@@ -77,10 +75,7 @@ async fn find_jobs(
         let jobs_page: Vec<Job> = response.json::<Vec<Job>>().await?;
         let res_max_age = jobs_page
             .iter()
-            .map(|j| match &j.created_at {
-                None => Duration::new(0, 0),
-                Some(c) => seconds_ago(c),
-            })
+            .map(|j| seconds_ago(&j.created_at.naive_utc()))
             .max()
             .unwrap_or(Duration::new(0, 0));
         let mut jobs_page = jobs_page
@@ -170,15 +165,15 @@ pub async fn job_history(
         let artifact_size = job.artifacts.into_iter().map(|a| a.size).sum();
         table.add_row(Row::new(vec![
             Cell::new(&job.id.to_string()),
-            Cell::new(&job.pipeline.id),
+            Cell::new(&job.pipeline.id.to_string()),
             Cell::new(&status),
             Cell::new(&job.failure_reason.unwrap_or_default()),
             Cell::new(&format_bytes(artifact_size)),
             Cell::new(&job.rref),
             Cell::new(&job.pipeline.sha[0..14]),
             Cell::new(&job.pipeline.source),
-            Cell::new(&job.created_at.unwrap_or_default()),
-            Cell::new(format_seconds(job.duration.unwrap_or_default()).as_str()),
+            Cell::new(&format!("{}", job.created_at)),
+            Cell::new(&format_seconds(job.duration.unwrap_or_default())),
         ]));
     }
 
