@@ -64,6 +64,7 @@ pub async fn show_job(
                 "Duration",
                 &format_seconds(job_details.duration.unwrap_or_default())
             ],
+            ["Runner", job_details.runner.unwrap().description],
             ["", ""],
             ["Ref", job_details.pipeline.rref],
             ["Source", job_details.pipeline.source],

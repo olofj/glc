@@ -150,7 +150,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let max_age = match max_age {
                 None => None,
                 Some(a) => parse(&a).ok(),
-            };
+            }
+            .map(|a| a.as_secs() as isize);
             list_jobs(&creds, &project, pipelines, max_age).await?;
         }
         Command::ShowJob {
@@ -173,7 +174,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let max_age = match max_age {
                 None => None,
                 Some(a) => parse(&a).ok(),
-            };
+            }
+            .map(|a| a.as_secs() as isize);
             job_history(&creds, &project, &name, max_age, source, rref).await?;
         }
         Command::ListProjects {} => {
@@ -187,7 +189,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let max_age = match max_age {
                 None => None,
                 Some(a) => parse(&a).ok(),
-            };
+            }
+            .map(|a| a.as_secs() as isize);
             list_pipelines(&creds, &project, max_age, source, rref).await?;
         }
     }

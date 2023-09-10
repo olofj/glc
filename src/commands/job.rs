@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::time::Duration;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Artifact {
@@ -82,10 +81,10 @@ pub async fn get_job_details(
 }
 
 // Returns number of seconds since the rfc3339 timestamp
-fn seconds_ago(ndt: &NaiveDateTime) -> Duration {
+fn seconds_ago(ndt: &NaiveDateTime) -> isize {
     let now = Utc::now().naive_utc();
 
-    (now - *ndt).to_std().unwrap()
+    (now - *ndt).num_seconds() as isize
 }
 
 pub async fn find_jobs(
@@ -93,13 +92,9 @@ pub async fn find_jobs(
     project: &str,
     pipelines: Option<Vec<usize>>,
     job_name: Option<&str>,
-    max_age: Option<Duration>,
+    max_age: Option<isize>,
 ) -> Result<Vec<Job>, Box<dyn std::error::Error>> {
-    let max_age = if pipelines.is_some() {
-        Duration::from_secs(std::u64::MAX)
-    } else {
-        max_age.unwrap()
-    };
+    let max_age = max_age.unwrap_or(std::isize::MAX);
     let mut jobs = Vec::new();
     let mut urls: Vec<String> = match pipelines {
         Some(pipelines) => pipelines
@@ -144,7 +139,7 @@ pub async fn find_jobs(
             .iter()
             .map(|j| seconds_ago(&j.created_at.naive_utc()))
             .max()
-            .unwrap_or(Duration::new(0, 0));
+            .unwrap_or(0);
         let mut jobs_page = if let Some(job_name) = job_name {
             jobs_page
                 .into_iter()

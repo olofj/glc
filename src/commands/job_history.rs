@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use colored::*;
 use prettytable::{format, row, Cell, Row, Table};
 
@@ -13,11 +11,11 @@ pub async fn job_history(
     creds: &Credentials,
     project: &str,
     job_name: &str,
-    max_age: Option<Duration>,
+    max_age: Option<isize>,
     source: Option<String>,
     rref: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let max_age = max_age.unwrap_or(Duration::from_secs(86400));
+    let max_age = max_age.unwrap_or(86400);
     let pipelines = match (source, rref) {
         (None, None) => None,
         (s, r) => {
@@ -42,7 +40,8 @@ pub async fn job_history(
         "Source",
         "Created",
         "Runner",
-        "Duration",
+        "Elapsed",
+        "Queued",
     ]);
 
     // Add a row per time
@@ -72,6 +71,7 @@ pub async fn job_history(
             Cell::new(&format!("{}", job.created_at)),
             Cell::new(&runner_name),
             Cell::new(&format_seconds(job.duration.unwrap_or_default())),
+            Cell::new(&format_seconds(job.queued_duration.unwrap_or_default())),
         ]));
     }
 

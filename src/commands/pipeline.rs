@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use regex::Regex;
@@ -20,25 +19,26 @@ pub struct Pipeline {
     pub sha: String,
     pub source: String,
     pub created_at: Option<String>,
+    pub started_at: Option<String>,
     pub updated_at: Option<String>,
     pub finished_at: Option<String>,
     pub web_url: String,
 }
 
 // Returns number of seconds since the rfc3339 timestamp
-fn seconds_ago(datetime: &str) -> Duration {
+fn seconds_ago(datetime: &str) -> isize {
     let timestamp: chrono::DateTime<Utc> = DateTime::parse_from_rfc3339(datetime)
         .expect("Failed to parse timestamp")
         .into();
     let now = Utc::now();
 
-    (now - timestamp).to_std().unwrap()
+    (now - timestamp).num_seconds() as isize
 }
 
 pub async fn get_pipelines(
     creds: &Credentials,
     project: &str,
-    max_age: Duration,
+    max_age: isize,
     source: Option<String>,
     rref: Option<String>,
 ) -> Result<Vec<Pipeline>, Box<dyn std::error::Error>> {
