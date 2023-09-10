@@ -11,6 +11,7 @@ mod commands {
     pub mod list_projects;
     pub mod login;
     pub mod pipeline;
+    pub mod runner;
     pub mod show_job;
 }
 mod format;
@@ -53,8 +54,11 @@ enum Command {
     #[structopt(name = "list-jobs")]
     ListJobs {
         /// Pipeline ID to list jobs for
-        #[structopt(short = "p", long = "pipeline")]
-        pipeline: Option<usize>,
+        #[structopt(short = "p", long = "pipelines")]
+        pipelines: Option<Vec<usize>>,
+        /// Max history ("1h", "10m", "4d" etc)
+        #[structopt(short = "m", long = "max-age")]
+        max_age: Option<String>,
     },
     /// List projects
     #[structopt(name = "list-projects")]
@@ -121,14 +125,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
     let project = opt.project.unwrap_or_default();
+    /*
+        let project: String = if true {
+            let repo_path = Path::new("."); // path to your git repository
+            match Repository::discover(repo_path) {
+                Ok(repo) => match repo.find_remote("origin") {
+                    Ok(remote) => remote.url().unwrap_or("No URL").to_string(),
+                    Err(e) => format!("Error: {}", e),
+                },
+                Err(e) => format!("Error: {}", e),
+            }
+        } else {
+            opt.project.unwrap().to_string()
+        };
+        println!("Project: {:?}", project);
+    */
     let creds = load_credentials()?;
 
     match opt.cmd {
         Command::Login { token, url } => {
             login(&token, &url)?;
         }
-        Command::ListJobs { pipeline } => {
-            list_jobs(&creds, &project, pipeline).await?;
+        Command::ListJobs { pipelines, max_age } => {
+            let max_age = match max_age {
+                None => None,
+                Some(a) => parse(&a).ok(),
+            };
+            list_jobs(&creds, &project, pipelines, max_age).await?;
         }
         Command::ShowJob {
             job,

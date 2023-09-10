@@ -1,10 +1,18 @@
 use crate::commands::credentials::Credentials;
 use crate::commands::pipeline::Pipeline;
+use crate::commands::runner::Runner;
+
 use anyhow::Result;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use regex::Regex;
+use reqwest::header::LINK;
 use reqwest::Url;
 use serde_derive::Deserialize;
 use std::sync::Arc;
+
+use std::collections::HashMap;
+use std::io::{self, Write};
+use std::time::Duration;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Artifact {
@@ -35,6 +43,7 @@ pub struct Job {
     pub artifacts: Vec<Artifact>,
     pub pipeline: Pipeline,
     pub tag_list: Vec<String>,
+    pub runner: Option<Runner>,
     // include other fields you are interested in
 }
 
@@ -70,4 +79,113 @@ pub async fn get_job_details(
     let job: Job = serde_json::from_str(&response_text)?;
 
     Ok(job)
+}
+
+// Returns number of seconds since the rfc3339 timestamp
+fn seconds_ago(ndt: &NaiveDateTime) -> Duration {
+    let now = Utc::now().naive_utc();
+
+    (now - *ndt).to_std().unwrap()
+}
+
+pub async fn find_jobs(
+    credentials: &Credentials,
+    project: &str,
+    pipelines: Option<Vec<usize>>,
+    job_name: Option<&str>,
+    max_age: Option<Duration>,
+) -> Result<Vec<Job>, Box<dyn std::error::Error>> {
+    let max_age = if pipelines.is_some() {
+        Duration::from_secs(std::u64::MAX)
+    } else {
+        max_age.unwrap()
+    };
+    let mut jobs = Vec::new();
+    let mut urls: Vec<String> = match pipelines {
+        Some(pipelines) => pipelines
+            .into_iter()
+            .map(|p| {
+                format!(
+                    "{}/api/v4/projects/{}/pipelines/{}/jobs?per_page=100",
+                    credentials.url, project, p
+                )
+            })
+            .collect(),
+        None => vec![format!(
+            "{}/api/v4/projects/{}/jobs?per_page=100",
+            credentials.url, project
+        )],
+    };
+    let client = reqwest::Client::new();
+    let mut next_url: Option<String> = urls.pop();
+    let mut stdout = io::stdout();
+
+    print!("Scanning for jobs: ");
+    while let Some(url) = next_url {
+        let response = client
+            .get(url)
+            .bearer_auth(&credentials.token)
+            .send()
+            .await?;
+
+        let link_header = response
+            .headers()
+            .get(LINK)
+            .ok_or("Missing Link header")?
+            .to_str()?;
+
+        next_url = match parse_next_page(link_header) {
+            None => urls.pop(),
+            u => u,
+        };
+
+        let jobs_page: Vec<Job> = response.json::<Vec<Job>>().await?;
+        let res_max_age = jobs_page
+            .iter()
+            .map(|j| seconds_ago(&j.created_at.naive_utc()))
+            .max()
+            .unwrap_or(Duration::new(0, 0));
+        let mut jobs_page = if let Some(job_name) = job_name {
+            jobs_page
+                .into_iter()
+                .filter(|j| j.name == job_name)
+                .collect::<Vec<Job>>()
+        } else {
+            jobs_page
+        };
+        let new = jobs_page.len();
+        jobs.append(&mut jobs_page);
+
+        if res_max_age > max_age {
+            next_url = None;
+        }
+        if new > 0 {
+            print!("*");
+        } else {
+            print!(".");
+        }
+        stdout.flush().unwrap();
+    }
+    println!(" {} found", jobs.len());
+
+    Ok(jobs)
+}
+
+fn parse_next_page(link_header: &str) -> Option<String> {
+    let links: HashMap<String, String> = link_header
+        .split(',')
+        .map(|line| {
+            let re = Regex::new(r#"<([^>]*)>;\s*rel="([^"]*)""#).unwrap();
+
+            re.captures(line)
+                .map(|cap| {
+                    let url = &cap[1];
+                    let rel = &cap[2];
+                    (rel.into(), url.into())
+                })
+                .unwrap()
+        })
+        .collect();
+    //    println!("links: {:?}", links);
+    links.get("next").cloned()
 }

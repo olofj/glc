@@ -1,92 +1,22 @@
-use std::collections::HashMap;
+use std::time::Duration;
 
 use colored::*;
 use prettytable::{format, row, Table};
-use regex::Regex;
-use reqwest::header::LINK;
 
 use chrono::Utc;
 
 use crate::commands::credentials::Credentials;
+use crate::commands::job::find_jobs;
 use crate::commands::job::Job;
 use crate::format::{format_bytes, format_seconds};
-
-async fn get_jobs(
-    credentials: &Credentials,
-    project: &str,
-    pipeline: Option<usize>,
-) -> Result<Vec<Job>, Box<dyn std::error::Error>> {
-    let mut jobs = Vec::new();
-    let url = match pipeline {
-        Some(pipeline) => format!(
-            "{}/api/v4/projects/{}/pipelines/{}/jobs",
-            credentials.url, project, pipeline
-        ),
-        None => format!("{}/api/v4/projects/{}/jobs", credentials.url, project),
-    };
-
-    let client = reqwest::Client::new();
-    let mut next_url: Option<String> = Some(url);
-    let mut count = 10;
-
-    while let Some(url) = next_url {
-        count -= 1;
-        let response = client
-            .get(url)
-            .bearer_auth(&credentials.token)
-            .send()
-            .await?;
-
-        let link_header = response
-            .headers()
-            .get(LINK)
-            .ok_or("Missing Link header")?
-            .to_str()?;
-        if count > 0 {
-            next_url = parse_next_page(link_header);
-        } else {
-            next_url = None;
-        }
-
-        let response_text = response.text().await?;
-        let mut jobs_page: Vec<Job> = serde_json::from_str(&response_text).map_err(|e| {
-            format!(
-                "Failed to parse JSON: {}\nOriginal JSON: {}",
-                e, response_text
-            )
-        })?;
-        //let mut jobs_page: Vec<Job> = response.json().await?;
-        jobs.append(&mut jobs_page);
-    }
-
-    Ok(jobs)
-}
-
-fn parse_next_page(link_header: &str) -> Option<String> {
-    let links: HashMap<String, String> = link_header
-        .split(',')
-        .map(|line| {
-            let re = Regex::new(r#"<([^>]*)>;\s*rel="([^"]*)""#).unwrap();
-
-            re.captures(line)
-                .map(|cap| {
-                    let url = &cap[1];
-                    let rel = &cap[2];
-                    (rel.into(), url.into())
-                })
-                .unwrap()
-        })
-        .collect();
-    //    println!("links: {:?}", links);
-    links.get("next").cloned()
-}
 
 pub async fn list_jobs(
     creds: &Credentials,
     project: &str,
-    pipeline: Option<usize>,
+    pipelines: Option<Vec<usize>>,
+    max_age: Option<Duration>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let jobs: Vec<Job> = get_jobs(creds, project, pipeline).await?;
+    let jobs: Vec<Job> = find_jobs(creds, project, pipelines, None, max_age).await?;
 
     // Create a new table
     let mut table = Table::new();
