@@ -92,7 +92,7 @@ pub async fn get_pipelines(
     }
     println!(" {} matched", pipelines.len());
 
-    Ok(pipelines)
+    Ok(pipelines.into_iter().rev().collect())
 }
 
 fn parse_next_page(link_header: &str) -> Option<String> {
