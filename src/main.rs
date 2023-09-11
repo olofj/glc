@@ -38,7 +38,6 @@ struct Opt {
 
 #[derive(StructOpt, Debug)]
 enum Command {
-    // ...
     /// Login to GitLab
     #[structopt(name = "login")]
     Login {
@@ -50,6 +49,7 @@ enum Command {
         #[structopt(short = "u", long = "url", parse(from_str))]
         url: String,
     },
+
     /// List jobs
     #[structopt(name = "list-jobs")]
     ListJobs {
@@ -60,25 +60,15 @@ enum Command {
         #[structopt(short = "m", long = "max-age")]
         max_age: Option<String>,
     },
+
     /// List projects
     #[structopt(name = "list-projects")]
     ListProjects {},
+
     /// Show job
     #[structopt(name = "show-job")]
-    ShowJob {
-        /// The ID of the job to show
-        #[structopt()]
-        job: usize,
-        /// Status summary after output
-        #[structopt(long = "no-status", parse(from_flag = std::ops::Not::not))]
-        status: bool,
-        /// Follow (keep listening)
-        #[structopt(short = "f", long = "follow")]
-        follow: Option<bool>,
-        /// Number of lines of output to show (negative number)
-        #[structopt()]
-        tail: Option<isize>,
-    },
+    ShowJob(ShowJobArgs),
+
     /// Get artifact from job
     #[structopt(name = "get-artifact")]
     GetArtifact {
@@ -89,6 +79,7 @@ enum Command {
         #[structopt(short = "n", long = "name")]
         name: String,
     },
+
     /// Show historical results for a job (by name)
     #[structopt(name = "job-history")]
     JobHistory {
@@ -105,6 +96,7 @@ enum Command {
         #[structopt(short = "r", long = "ref")]
         rref: Option<String>,
     },
+
     /// List pipelines
     #[structopt(name = "list-pipelines")]
     ListPipelines {
@@ -118,6 +110,47 @@ enum Command {
         #[structopt(short = "r", long = "ref")]
         rref: Option<String>,
     },
+}
+
+#[derive(StructOpt, Debug)]
+pub struct ShowJobArgs {
+    /// The ID of the job to show
+    #[structopt(conflicts_with = "pipeline")]
+    job: Option<usize>,
+    /// Pipeline ID to show jobs for
+    #[structopt(short = "p", long = "pipeline", conflicts_with = "job")]
+    pipeline: Option<usize>,
+    /// Status summary after output
+    #[structopt(long = "no-status", parse(from_flag = std::ops::Not::not))]
+    status: bool,
+    /// Follow (keep listening)
+    #[structopt(short = "f", long = "follow", requires = "job")]
+    _follow: Option<bool>,
+    /// Number of lines of output to show (negative number)
+    #[structopt(short = "t", long = "tail")]
+    tail: Option<usize>,
+    /// Show job prefix for every line of log
+    #[structopt(long = "prefix")]
+    prefix: bool,
+    /// Remove all ANSI control characters
+    #[structopt(long = "plain")]
+    plain: bool,
+}
+
+impl ShowJobArgs {
+    fn validate(&mut self) -> Result<(), String> {
+        if self.job.is_none() && self.pipeline.is_none() {
+            return Err(String::from("Must specify either job or pipeline."));
+        }
+        if let Some(_) = self.pipeline {
+            if self.status {
+                self.status = false; // default for pipeline
+            } else if self.status {
+                return Err(String::from("Cannot use status with pipeline."));
+            }
+        }
+        Ok(())
+    }
 }
 
 #[tokio::main]
@@ -154,13 +187,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|a| a.as_secs() as isize);
             list_jobs(&creds, &project, pipelines, max_age).await?;
         }
-        Command::ShowJob {
-            job,
-            status,
-            follow,
-            tail,
-        } => {
-            show_job(&creds, &project, job, status, follow, tail).await?;
+        Command::ShowJob(mut args) => {
+            if let Err(err) = args.validate() {
+                eprintln!("Error: {}", err);
+                std::process::exit(1);
+            }
+            show_job(
+                &creds,
+                &project,
+                &args,
+            )
+            .await?;
         }
         Command::GetArtifact { job, name } => {
             get_artifact(&creds, &project, job, name).await?;
