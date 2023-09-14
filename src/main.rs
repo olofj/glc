@@ -9,6 +9,7 @@ mod commands {
     pub mod list_jobs;
     pub mod list_pipelines;
     pub mod list_projects;
+    pub mod list_runners;
     pub mod login;
     pub mod pipeline;
     pub mod runner;
@@ -22,6 +23,7 @@ use commands::job_history::job_history;
 use commands::list_jobs::list_jobs;
 use commands::list_pipelines::list_pipelines;
 use commands::list_projects::list_projects;
+use commands::list_runners::list_runners;
 use commands::login::login;
 use commands::show_job::show_job;
 
@@ -64,6 +66,10 @@ enum Command {
     /// List projects
     #[structopt(name = "list-projects")]
     ListProjects {},
+
+    /// List runners
+    #[structopt(name = "list-runners")]
+    ListRunners {},
 
     /// Show job
     #[structopt(name = "show-job")]
@@ -192,12 +198,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("Error: {}", err);
                 std::process::exit(1);
             }
-            show_job(
-                &creds,
-                &project,
-                &args,
-            )
-            .await?;
+            show_job(&creds, &project, &args).await?;
         }
         Command::GetArtifact { job, name } => {
             get_artifact(&creds, &project, job, name).await?;
@@ -217,6 +218,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Command::ListProjects {} => {
             list_projects(&creds).await?;
+        }
+        Command::ListRunners {} => {
+            list_runners(&creds).await?;
         }
         Command::ListPipelines {
             max_age,

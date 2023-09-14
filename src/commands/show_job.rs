@@ -17,7 +17,14 @@ pub async fn show_job(
     let jobs: Vec<Job> = if let Some(pipeline) = args.pipeline {
         find_jobs(creds, project, Some(vec![pipeline]), None, None).await?
     } else {
-        vec![get_job_details(Arc::new(creds.clone()), project.to_string(), args.job.unwrap()).await?]
+        vec![
+            get_job_details(
+                Arc::new(creds.clone()),
+                project.to_string(),
+                args.job.unwrap(),
+            )
+            .await?,
+        ]
     };
 
     let creds = Arc::new(creds.clone());
