@@ -61,6 +61,9 @@ enum Command {
         /// Max history ("1h", "10m", "4d" etc)
         #[structopt(short = "m", long = "max-age")]
         max_age: Option<String>,
+        /// Status ("Success", "Running", "Failed", etc)
+        #[structopt(short = "s", long = "status")]
+        status: Option<String>,
     },
 
     /// List projects
@@ -185,13 +188,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Command::Login { token, url } => {
             login(&token, &url)?;
         }
-        Command::ListJobs { pipelines, max_age } => {
+        Command::ListJobs {
+            pipelines,
+            max_age,
+            status,
+        } => {
             let max_age = match max_age {
                 None => None,
                 Some(a) => parse(&a).ok(),
             }
             .map(|a| a.as_secs() as isize);
-            list_jobs(&creds, &project, pipelines, max_age).await?;
+            println!("ListJobs max_age {:?}", max_age);
+            list_jobs(&creds, &project, pipelines, max_age, status).await?;
         }
         Command::ShowJob(mut args) => {
             if let Err(err) = args.validate() {

@@ -23,8 +23,15 @@ pub async fn job_history(
             Some(pipelines.into_iter().map(|p| p.id as usize).collect())
         }
     };
-    let jobs: Vec<Job> =
-        find_jobs(creds, project, pipelines, Some(job_name), Some(max_age)).await?;
+    let jobs: Vec<Job> = find_jobs(
+        creds,
+        project,
+        pipelines,
+        Some(job_name),
+        Some(max_age),
+        None,
+    )
+    .await?;
 
     // Create a new table
     let mut table = Table::new();

@@ -93,6 +93,7 @@ pub async fn find_jobs(
     pipelines: Option<Vec<usize>>,
     job_name: Option<&str>,
     max_age: Option<isize>,
+    status: Option<String>,
 ) -> Result<Vec<Job>, Box<dyn std::error::Error>> {
     let max_age = max_age.unwrap_or(std::isize::MAX);
     let mut jobs = Vec::new();
@@ -140,14 +141,11 @@ pub async fn find_jobs(
             .map(|j| seconds_ago(&j.created_at.naive_utc()))
             .max()
             .unwrap_or(0);
-        let mut jobs_page = if let Some(job_name) = job_name {
-            jobs_page
-                .into_iter()
-                .filter(|j| j.name == job_name)
-                .collect::<Vec<Job>>()
-        } else {
-            jobs_page
-        };
+        let mut jobs_page: Vec<Job> = jobs_page
+            .into_iter()
+            .filter(|j| job_name.as_ref().map_or(true, |name| &j.name == name))
+            .filter(|j| status.as_ref().map_or(true, |status| &j.status == status))
+            .collect();
         let new = jobs_page.len();
         jobs.append(&mut jobs_page);
 

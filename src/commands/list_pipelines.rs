@@ -30,7 +30,15 @@ pub async fn list_pipelines(
     // Create a new table
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_LINESEP);
-    table.set_titles(row!["ID", "🔄 Status", "Elapsed", "Source", "SHA", "Ref"]);
+    table.set_titles(row![
+        "ID",
+        "Created",
+        "🔄 Status",
+        "Elapsed",
+        "Source",
+        "SHA",
+        "Ref"
+    ]);
 
     // Add a row per time
     for pipeline in pipelines {
@@ -42,7 +50,7 @@ pub async fn list_pipelines(
         };
         let mut elapsed = match (
             pipeline.status.as_str(),
-            pipeline.created_at,
+            pipeline.created_at.clone(),
             pipeline.updated_at,
         ) {
             ("running", Some(c), _) => format_seconds(seconds_ago(c) as f64),
@@ -52,8 +60,14 @@ pub async fn list_pipelines(
         if pipeline.status == "running" {
             elapsed.push_str("+");
         }
+        let created = if let Some(created) = pipeline.created_at {
+            created
+        } else {
+            "-".to_string()
+        };
         table.add_row(row![
             &pipeline.id.to_string(),
+            &created,
             &status,
             &elapsed,
             &pipeline.source,

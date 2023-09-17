@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use chrono::{DateTime, Utc};
 use colored::*;
-use prettytable::{format, row, Cell, Table};
+use prettytable::{format, row, Row, Cell, Table};
 
 use crate::commands::credentials::Credentials;
 use crate::commands::job::find_jobs;
@@ -24,15 +24,18 @@ pub async fn list_jobs(
     project: &str,
     pipelines: Option<Vec<usize>>,
     max_age: Option<isize>,
+    status: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let list_pipeline = pipelines.is_some();
-    let jobs: Vec<Job> = find_jobs(creds, project, pipelines, None, max_age).await?;
+    let jobs: Vec<Job> = find_jobs(creds, project, pipelines, None, max_age, status).await?;
 
     // Create a new table
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
     let mut titles = vec![
         "ID",
+        "Pipeline",
+        "Ref",
         "Status",
         "Reason",
         "Step",
@@ -49,6 +52,11 @@ pub async fn list_jobs(
 
     table.set_titles(titles.into_iter().map(|t| Cell::new(t)).collect());
 
+    if jobs.is_empty() {
+        table.add_row(Row::new(vec![Cell::new("No jobs found").with_hspan(12)]));
+        table.printstd();
+        return Ok(());
+    }
     // Normalize jobs based on oldest created_at
     let min = jobs.iter().map(|job| job.created_at).min().unwrap();
     let max = jobs
@@ -94,6 +102,8 @@ pub async fn list_jobs(
         //println!("job {:?} status {:?} started {:?} duration {:?}", job.id, job.status, start_position, duration_width);
         let mut row = row![
             &job.id.to_string(),
+            &job.pipeline.id,
+            &job.pipeline.rref,
             &status.to_string(),
             &job.failure_reason.unwrap_or_default(),
             &job.stage,
