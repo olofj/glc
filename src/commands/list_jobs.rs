@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use chrono::{DateTime, Utc};
 use colored::*;
-use prettytable::{format, row, Row, Cell, Table};
+use prettytable::{format, row, Cell, Row, Table};
 
 use crate::commands::credentials::Credentials;
 use crate::commands::job::find_jobs;
