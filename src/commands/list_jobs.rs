@@ -87,7 +87,11 @@ pub async fn list_jobs(
             "created" => "🌱\u{00a0} Created".normal(),
             stat => format!("❓\u{00a0} {stat}").normal(),
         };
-        let duration = job.finished_at - job.started_at;
+        let duration = if job.status == "running" {
+            Utc::now() - job.started_at
+        } else {
+            job.finished_at - job.started_at
+        };
         let artifact_size = job.artifacts.into_iter().map(|a| a.size).sum();
         let start_position = (job.started_at - min).num_seconds() as f64 * scale;
         let duration_width = duration.num_seconds() as f64 * scale;
