@@ -36,6 +36,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: build
+        target: x86_64-unknown-linux-musl
         args: --all --verbose
     - name: Run tests
       uses: actions-rs/cargo@v1
