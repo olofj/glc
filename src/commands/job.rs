@@ -75,6 +75,7 @@ pub async fn get_job_details(
 
     let response_text = response.text().await?;
 
+    //println!("{:#?}", response_text);
     let job: Job = serde_json::from_str(&response_text)?;
 
     Ok(job)
