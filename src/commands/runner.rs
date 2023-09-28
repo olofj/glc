@@ -9,7 +9,7 @@ pub struct Runner {
     pub paused: bool,
     pub is_shared: bool,
     pub runner_type: String,
-    pub name: String,
+    pub name: Option<String>,
     pub online: bool,
     pub status: String,
 }
