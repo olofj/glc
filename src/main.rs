@@ -1,6 +1,8 @@
 use parse_duration::parse;
 use structopt::StructOpt;
 
+//use gix;
+
 mod commands {
     pub mod get_artifact;
     pub mod job_history;
@@ -10,6 +12,7 @@ mod commands {
     pub mod list_runners;
     pub mod login;
     pub mod show_job;
+    pub mod test_report;
 }
 mod credentials;
 mod format;
@@ -166,21 +169,28 @@ impl ShowJobArgs {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
-    let project = opt.project.unwrap_or_default();
+    let project = opt.project.unwrap_or(".".to_string());
     /*
-        let project: String = if true {
-            let repo_path = Path::new("."); // path to your git repository
-            match Repository::discover(repo_path) {
-                Ok(repo) => match repo.find_remote("origin") {
-                    Ok(remote) => remote.url().unwrap_or("No URL").to_string(),
-                    Err(e) => format!("Error: {}", e),
-                },
+    println!("repo path: {:#?}", project);
+    let repo = gix::discover(project.clone())?;
+    println!("repo: {:#?}", repo);
+    let remote = repo.find_default_remote(gix::remote::Direction::Push);
+    println!("remote: {:#?}", remote);
+    */
+    /*
+    let project: String = if true {
+        let repo_path = Path::new("."); // path to your git repository
+        match Repository::discover(repo_path) {
+            Ok(repo) => match repo.find_remote("origin") {
+                Ok(remote) => remote.url().unwrap_or("No URL").to_string(),
                 Err(e) => format!("Error: {}", e),
-            }
-        } else {
-            opt.project.unwrap().to_string()
-        };
-        println!("Project: {:?}", project);
+            },
+            Err(e) => format!("Error: {}", e),
+        }
+    } else {
+        opt.project.unwrap().to_string()
+    };
+    println!("Project: {:?}", project);
     */
     let creds = load_credentials()?;
 
@@ -198,6 +208,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(a) => parse(&a).ok(),
             }
             .map(|a| a.as_secs() as isize);
+            let pipelines = pipelines.unwrap_or_else(Vec::new);
             println!("ListJobs max_age {:?}", max_age);
             list_jobs(&creds, &project, pipelines, max_age, status).await?;
         }
@@ -228,6 +239,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             list_projects(&creds).await?;
         }
         Command::ListRunners {} => {
+            println!("list_runners");
             list_runners(&creds).await?;
         }
         Command::ListPipelines {

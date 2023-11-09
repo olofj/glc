@@ -22,13 +22,13 @@ fn compare_dates_with_tolerance(a: &DateTime<Utc>, b: &DateTime<Utc>, tolerance:
 pub async fn list_jobs(
     creds: &Credentials,
     project: &str,
-    pipelines: Option<Vec<usize>>,
+    pipelines: Vec<usize>,
     max_age: Option<isize>,
     status: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let list_pipeline = pipelines.is_some();
+    let list_pipeline = !pipelines.is_empty();
     // With specific pipelines, don't use max_age
-    let max_age = if !pipelines.is_some() { max_age } else { None };
+    let max_age = if pipelines.is_empty() { max_age } else { None };
     let jobs: Vec<Job> = find_jobs(creds, project, pipelines, None, max_age, status).await?;
 
     // Create a new table
@@ -80,6 +80,11 @@ pub async fn list_jobs(
         jobs = jobs.into_iter().rev().collect();
     }
 
+    let total_artifacts: usize = jobs
+        .iter()
+        .map(|j| j.artifacts.iter().map(|a| a.size).sum::<usize>())
+        .sum();
+
     // Add a row per time
     for job in jobs.into_iter() {
         let status = match job.status.as_str() {
@@ -130,6 +135,11 @@ pub async fn list_jobs(
 
     // Print the table to stdout
     table.printstd();
+
+    println!(
+        "Total artifacts produced: {}",
+        format_bytes(total_artifacts)
+    );
 
     Ok(())
 }

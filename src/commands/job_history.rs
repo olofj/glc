@@ -17,10 +17,10 @@ pub async fn job_history(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let max_age = max_age.unwrap_or(86400);
     let pipelines = match (source, rref) {
-        (None, None) => None,
+        (None, None) => Vec::new(),
         (s, r) => {
             let pipelines = get_pipelines(creds, project, max_age, s, r).await?;
-            Some(pipelines.into_iter().map(|p| p.id as usize).collect())
+            pipelines.into_iter().map(|p| p.id as usize).collect()
         }
     };
     let jobs: Vec<Job> = find_jobs(

@@ -15,7 +15,7 @@ pub async fn show_job(
     args: &ShowJobArgs,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let jobs: Vec<Job> = if let Some(pipeline) = args.pipeline {
-        find_jobs(creds, project, Some(vec![pipeline]), None, None, None).await?
+        find_jobs(creds, project, vec![pipeline], None, None, None).await?
     } else {
         vec![
             get_job_details(

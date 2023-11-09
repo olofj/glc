@@ -16,18 +16,23 @@ struct RunnerDetail {
     ip_address: String,
     active: bool,
     is_shared: bool,
-    runner_type: String,
+    runner_type: Option<String>,
     version: String,
     tag_list: Vec<String>,
     // Add more fields as per your requirement
 }
 
 pub async fn list_runners(creds: &Credentials) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Foo?!");
     let url = format!("{}/api/v4/runners/all?per_page=100", creds.url);
+    println!("Foo?!");
     let url = Url::parse(&url)?;
 
+    println!("Foo?!");
     let client = reqwest::Client::new();
     let response = client.get(url).bearer_auth(&creds.token).send().await?;
+
+    println!("response: {:#?}", response);
 
     let runners: Vec<usize> = response
         .json::<Vec<RunnerShort>>()
@@ -35,6 +40,8 @@ pub async fn list_runners(creds: &Credentials) -> Result<(), Box<dyn std::error:
         .into_iter()
         .map(|r| r.id)
         .collect();
+
+    println!("runners: {:#?}", runners);
 
     let mut table = Table::new();
 
@@ -86,7 +93,7 @@ pub async fn list_runners(creds: &Credentials) -> Result<(), Box<dyn std::error:
             Cell::new(&d.tag_list.join(",")),
             Cell::new(&d.active.to_string()),
             Cell::new(&d.is_shared.to_string()),
-            Cell::new(&d.runner_type),
+            Cell::new(&d.runner_type.unwrap_or("-".to_string())),
         ]));
     }
 

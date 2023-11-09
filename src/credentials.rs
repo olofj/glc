@@ -7,6 +7,7 @@ use std::io::BufReader;
 pub struct Credentials {
     pub token: String,
     pub url: String,
+    pub project: Option<String>,
 }
 
 pub fn load_credentials() -> std::io::Result<Credentials> {
