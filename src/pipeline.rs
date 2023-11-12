@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
 
-use chrono::{DateTime, Utc};
+use anyhow::{anyhow, Result};
+use chrono::{DateTime, Duration, Utc};
 use regex::Regex;
 use reqwest::header::LINK;
 use reqwest::Url;
@@ -41,10 +42,12 @@ pub async fn get_pipelines(
     max_age: isize,
     source: Option<String>,
     rref: Option<String>,
-) -> Result<Vec<Pipeline>, Box<dyn std::error::Error>> {
+) -> Result<Vec<Pipeline>, anyhow::Error> {
     let url = format!(
-        "{}/api/v4/projects/{}/pipelines?per_page=100",
-        creds.url, project
+        "{}/api/v4/projects/{}/pipelines?per_page=100&updated_after={}",
+        creds.url,
+        project,
+        (Utc::now() - Duration::seconds(max_age as i64)).to_rfc3339()
     );
     let url = Url::parse(&url)?;
     let mut pipelines: Vec<Pipeline> = Vec::new();
@@ -65,7 +68,7 @@ pub async fn get_pipelines(
         let link_header = response
             .headers()
             .get(LINK)
-            .ok_or("Missing Link header")?
+            .ok_or(anyhow!("Missing Link header"))?
             .to_str()?;
 
         print!(".");
