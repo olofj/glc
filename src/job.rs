@@ -1,5 +1,5 @@
 use crate::credentials::Credentials;
-use crate::pipeline::Pipeline;
+use crate::pipeline::{get_pipelines, Pipeline};
 use crate::runner::Runner;
 
 use anyhow::Result;
@@ -7,9 +7,12 @@ use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use reqwest::Client;
 use reqwest::Url;
 use serde_derive::Deserialize;
+use std::io::Write;
 use std::sync::Arc;
 
-use futures::future::join_all;
+use futures::future::try_join_all;
+use std::time::Instant;
+use tokio::sync::Semaphore;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Artifact {
@@ -93,51 +96,159 @@ pub async fn find_jobs(
     job_name: Option<&str>,
     max_age: Option<isize>,
     status: Option<String>,
-) -> Result<Vec<Job>, Box<dyn std::error::Error>> {
+) -> Result<Vec<Job>, anyhow::Error> {
     let max_age = max_age.unwrap_or(std::isize::MAX);
-    let client = reqwest::Client::new();
+    let client = Client::new();
+    let semaphore = Arc::new(Semaphore::new(30));
 
-    // Collect all the futures into a Vec
-    let job_futures: Vec<_> = pipelines
+    let start_time = Instant::now();
+
+    let pipelines = if pipelines.is_empty() {
+        get_pipelines(credentials, project, max_age, None, None)
+            .await?
+            .into_iter()
+            .map(|p| p.id as usize)
+            .collect()
+    } else {
+        pipelines
+    };
+
+    let scope_arg = status
+        .as_ref()
+        .map_or(String::new(), |s| format!("&scope={}", s));
+
+    let base_urls: Vec<String> = pipelines
         .iter()
         .map(|&pipeline_id| {
-            let client = client.clone();
-            let url = format!(
-                "{}/api/v4/projects/{}/pipelines/{}/jobs?per_page=100",
-                credentials.url, project, pipeline_id
-            );
-            async move {
-                let response = client
-                    .get(&url)
-                    .bearer_auth(&credentials.token)
-                    .send()
-                    .await?;
-
-                response
-                    .json::<Vec<Job>>()
-                    .await
-                    .map_err(Into::<Box<dyn std::error::Error>>::into) // Convert the error type
-            }
+            format!(
+                "{}/api/v4/projects/{}/pipelines/{}/jobs?per_page=100{}&include_retried=Yes",
+                credentials.url, project, pipeline_id, scope_arg
+            )
         })
         .collect();
 
-    // Now, use join_all to execute them concurrently and await their results
-    let jobs_results = join_all(job_futures).await;
+    let mut job_futures = Vec::new();
 
-    // Process the results
+    for base_url in base_urls.iter() {
+        let client = client.clone();
+        let credentials = credentials.clone();
+        let sem = semaphore.clone();
+
+        job_futures.push(async move {
+            // Each return has a `x-total-pages` attribute coming back, so
+            // fetch the first page to know how many more to get
+            let first_page_url = format!("{}&page=1", base_url);
+
+            let _permit = sem.acquire().await.unwrap();
+            let response = client
+                .clone()
+                .get(&first_page_url)
+                .bearer_auth(&credentials.token)
+                .send()
+                .await?;
+
+            let total_pages = response
+                .headers()
+                .get("x-total-pages")
+                .ok_or_else(|| anyhow::Error::msg("Missing x-total-pages header"))?
+                .to_str()?
+                .parse::<usize>()?;
+
+            let mut all_jobs_for_pipeline: Vec<Job> = response
+                .json::<Vec<Job>>()
+                .await?
+                .into_iter()
+                .filter(|j| {
+                    job_name.map_or(true, |name| j.name == name)
+                        && seconds_ago(&j.created_at.naive_utc()) <= max_age
+                })
+                .collect();
+
+            drop(_permit);
+
+            if all_jobs_for_pipeline.is_empty() {
+                print!(".");
+            } else {
+                print!("*");
+            }
+            std::io::stdout().flush().unwrap();
+
+            let page_futures: Vec<_> = (2..=total_pages)
+                .map(|page| {
+                    let client = client.clone();
+                    let page_url = format!("{}&page={}", base_url, page);
+                    let credentials = credentials.clone();
+                    let sem = sem.clone();
+
+                    async move {
+                        let _permit = sem.acquire().await.unwrap();
+                        //println!("requesting {}", page_url);
+                        let response = client
+                            .get(&page_url)
+                            .bearer_auth(&credentials.token)
+                            .send()
+                            .await?;
+
+                        let text = response.text().await.map_err(Into::<anyhow::Error>::into)?;
+                        drop(_permit);
+
+                        let jobs = serde_json::from_str::<Vec<Job>>(&text);
+                        let ret: Result<Vec<Job>, anyhow::Error> = match jobs {
+                            Ok(job) => {
+                                // If successful, proceed with the jobs after filtering
+                                let job: Vec<Job> = job
+                                    .into_iter()
+                                    .filter(|j| {
+                                        job_name.map_or(true, |name| j.name == name)
+                                            && seconds_ago(&j.created_at.naive_utc()) <= max_age
+                                    })
+                                    .collect();
+
+                                if job.is_empty() {
+                                    print!(".");
+                                } else {
+                                    print!("*");
+                                }
+                                std::io::stdout().flush().unwrap();
+                                Ok(job)
+                            }
+                            Err(e) => {
+                                // If there's an error, print the error and the response body
+                                println!(
+                                    "Error processing JSON: {}\nURL{}\nResponse was: {}",
+                                    e, page_url, text
+                                );
+                                Err(e.into())
+                            }
+                        };
+                        //println!("done");
+                        ret
+                    }
+                })
+                .collect();
+
+            let pages_results = try_join_all(page_futures).await?;
+            for jobs in pages_results {
+                all_jobs_for_pipeline.extend(jobs);
+            }
+
+            Ok::<Vec<Job>, anyhow::Error>(all_jobs_for_pipeline)
+        });
+    }
+    print!("Fetching jobs from pipelines: ");
+    let jobs_results = try_join_all(job_futures).await?;
+    println!("");
+    println!("Request completed in: {:?}", start_time.elapsed());
+
     let mut all_jobs = Vec::new();
-    for jobs_res in jobs_results {
-        let mut jobs_page = jobs_res?;
-        // Filter jobs by job_name, status, and max_age
-        jobs_page.retain(|job| {
+    for mut jobs in jobs_results {
+        jobs.retain(|job| {
             job_name.map_or(true, |name| job.name == name)
-                && status.as_ref().map_or(true, |s| &job.status == s)
                 && seconds_ago(&job.created_at.naive_utc()) <= max_age
         });
-        all_jobs.extend(jobs_page);
+        all_jobs.extend(jobs);
     }
 
-    println!("{} jobs found", all_jobs.len());
-
+    println!("Completely completed in: {:?}", start_time.elapsed());
     Ok(all_jobs)
 }
