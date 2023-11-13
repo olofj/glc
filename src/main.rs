@@ -1,4 +1,5 @@
 use parse_duration::parse;
+use std::io::{self, Write};
 use structopt::StructOpt;
 
 //use gix;
@@ -34,8 +35,13 @@ use credentials::load_credentials;
 #[structopt(name = "glc", about = "gitlab client utility")]
 struct Opt {
     /// The project ID
-    #[structopt(short = "P", long = "project", env = "GITLAB_PROJECT")]
-    project: Option<String>,
+    #[structopt(
+        short = "P",
+        long = "project",
+        env = "GITLAB_PROJECT",
+        default_value = "197"
+    )]
+    project: String,
 
     #[structopt(subcommand)]
     cmd: Command,
@@ -62,8 +68,8 @@ enum Command {
         #[structopt(short = "p", long = "pipelines")]
         pipelines: Option<Vec<usize>>,
         /// Max history ("1h", "10m", "4d" etc)
-        #[structopt(short = "m", long = "max-age")]
-        max_age: Option<String>,
+        #[structopt(short = "m", default_value = "24h", long = "max-age")]
+        max_age: String,
         /// Status ("Success", "Running", "Failed", etc)
         #[structopt(short = "s", long = "status")]
         status: Option<String>,
@@ -99,8 +105,8 @@ enum Command {
         #[structopt(short = "n", long = "name")]
         name: String,
         /// Max history ("1h", "10m", "4d" etc)
-        #[structopt(short = "m", long = "max-age")]
-        max_age: Option<String>,
+        #[structopt(short = "m", default_value = "24h", long = "max-age")]
+        max_age: String,
         /// Source (type of pipeline)
         #[structopt(short = "s", long = "source")]
         source: Option<String>,
@@ -113,8 +119,8 @@ enum Command {
     #[structopt(name = "list-pipelines")]
     ListPipelines {
         /// Max history ("1h", "10m", "4d" etc)
-        #[structopt(short = "m", long = "max-age")]
-        max_age: Option<String>,
+        #[structopt(short = "m", default_value = "24h", long = "max-age")]
+        max_age: String,
         /// Source (type of pipeline)
         #[structopt(short = "s", long = "source")]
         source: Option<String>,
@@ -169,7 +175,7 @@ impl ShowJobArgs {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
-    let project = opt.project.unwrap_or(".".to_string());
+    let project = opt.project;
     /*
     println!("repo path: {:#?}", project);
     let repo = gix::discover(project.clone())?;
@@ -203,11 +209,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             max_age,
             status,
         } => {
-            let max_age = match max_age {
-                None => None,
-                Some(a) => parse(&a).ok(),
-            }
-            .map(|a| a.as_secs() as isize);
+            let max_age = parse(&max_age)?.as_secs() as isize;
             let pipelines = pipelines.unwrap_or_else(Vec::new);
             println!("ListJobs max_age {:?}", max_age);
             list_jobs(&creds, &project, pipelines, max_age, status).await?;
@@ -228,11 +230,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             source,
             rref,
         } => {
-            let max_age = match max_age {
-                None => None,
-                Some(a) => parse(&a).ok(),
-            }
-            .map(|a| a.as_secs() as isize);
+            let max_age = parse(&max_age)?.as_secs() as isize;
             job_history(&creds, &project, &name, max_age, source, rref).await?;
         }
         Command::ListProjects {} => {
@@ -247,14 +245,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             source,
             rref,
         } => {
-            let max_age = match max_age {
-                None => None,
-                Some(a) => parse(&a).ok(),
-            }
-            .map(|a| a.as_secs() as isize);
+            let max_age = parse(&max_age)?.as_secs() as isize;
             list_pipelines(&creds, &project, max_age, source, rref).await?;
         }
     }
 
+    io::stdout().flush().unwrap();
     Ok(())
 }

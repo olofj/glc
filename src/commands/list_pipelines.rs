@@ -21,12 +21,10 @@ fn seconds_ago(datetime: String) -> isize {
 pub async fn list_pipelines(
     creds: &Credentials,
     project: &str,
-    max_age: Option<isize>,
+    max_age: isize,
     source: Option<String>,
     rref: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let max_age = max_age.unwrap_or(86400);
-
     let pipelines = get_pipelines(creds, project, max_age, source, rref).await?;
 
     // Create a new table

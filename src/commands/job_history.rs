@@ -11,11 +11,10 @@ pub async fn job_history(
     creds: &Credentials,
     project: &str,
     job_name: &str,
-    max_age: Option<isize>,
+    max_age: isize,
     source: Option<String>,
     rref: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let max_age = max_age.unwrap_or(86400);
     let pipelines = match (source, rref) {
         (None, None) => Vec::new(),
         (s, r) => {

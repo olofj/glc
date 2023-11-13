@@ -23,12 +23,16 @@ pub async fn list_jobs(
     creds: &Credentials,
     project: &str,
     pipelines: Vec<usize>,
-    max_age: Option<isize>,
+    max_age: isize,
     status: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let list_pipeline = !pipelines.is_empty();
     // With specific pipelines, don't use max_age
-    let max_age = if pipelines.is_empty() { max_age } else { None };
+    let max_age = if pipelines.is_empty() {
+        Some(max_age)
+    } else {
+        None
+    };
     let jobs: Vec<Job> = find_jobs(creds, project, pipelines, None, max_age, status).await?;
 
     // Create a new table
