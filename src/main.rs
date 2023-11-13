@@ -52,10 +52,6 @@ enum Command {
     /// Login to GitLab
     #[structopt(name = "login")]
     Login {
-        /// Personal access token
-        #[structopt(short = "t", long = "token", parse(from_str))]
-        token: String,
-
         /// GitLab URL
         #[structopt(short = "u", long = "url", parse(from_str))]
         url: String,
@@ -198,11 +194,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     println!("Project: {:?}", project);
     */
+    if let Command::Login { url } = opt.cmd {
+        login(&url)?;
+        return Ok(());
+    }
+
     let creds = load_credentials()?;
 
     match opt.cmd {
-        Command::Login { token, url } => {
-            login(&token, &url)?;
+        Command::Login { url } => {
+            login(&url)?;
         }
         Command::ListJobs {
             pipelines,
