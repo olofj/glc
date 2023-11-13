@@ -1,6 +1,6 @@
-use crate::commands::credentials::Credentials;
-use crate::commands::pipeline::Pipeline;
-use crate::commands::runner::Runner;
+use crate::credentials::Credentials;
+use crate::pipeline::Pipeline;
+use crate::runner::Runner;
 
 use anyhow::Result;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};

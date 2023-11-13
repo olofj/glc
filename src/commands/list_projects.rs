@@ -2,8 +2,8 @@ use colored::*;
 use prettytable::{format, row, Table};
 use reqwest::Url;
 
-use crate::commands::credentials::Credentials;
-use crate::commands::pipeline::Pipeline;
+use crate::credentials::Credentials;
+use crate::pipeline::Pipeline;
 
 pub async fn list_projects(creds: &Credentials) -> Result<(), Box<dyn std::error::Error>> {
     let url = format!("{}/api/v4/projects", creds.url);

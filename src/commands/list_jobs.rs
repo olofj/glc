@@ -4,10 +4,10 @@ use chrono::{DateTime, Utc};
 use colored::*;
 use prettytable::{format, row, Cell, Row, Table};
 
-use crate::commands::credentials::Credentials;
-use crate::commands::job::find_jobs;
-use crate::commands::job::Job;
+use crate::credentials::Credentials;
 use crate::format::{format_bytes, format_seconds};
+use crate::job::find_jobs;
+use crate::job::Job;
 
 fn compare_dates_with_tolerance(a: &DateTime<Utc>, b: &DateTime<Utc>, tolerance: i64) -> Ordering {
     let difference = a.signed_duration_since(*b).num_seconds().abs();
@@ -27,6 +27,8 @@ pub async fn list_jobs(
     status: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let list_pipeline = pipelines.is_some();
+    // With specific pipelines, don't use max_age
+    let max_age = if !pipelines.is_some() { max_age } else { None };
     let jobs: Vec<Job> = find_jobs(creds, project, pipelines, None, max_age, status).await?;
 
     // Create a new table

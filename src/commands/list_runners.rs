@@ -2,7 +2,7 @@ use prettytable::{format, row, Cell, Row, Table};
 use reqwest::Url;
 use serde_derive::Deserialize;
 
-use crate::commands::credentials::Credentials;
+use crate::credentials::Credentials;
 
 #[derive(Deserialize, Debug)]
 struct RunnerShort {

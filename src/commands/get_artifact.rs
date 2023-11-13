@@ -8,7 +8,7 @@ use reqwest::StatusCode;
 use zip::read::ZipArchive;
 use zip::result::ZipError;
 
-use crate::commands::credentials::Credentials;
+use crate::credentials::Credentials;
 
 pub async fn get_artifact(
     credentials: &Credentials,

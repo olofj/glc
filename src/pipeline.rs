@@ -7,7 +7,7 @@ use reqwest::header::LINK;
 use reqwest::Url;
 use serde_derive::Deserialize;
 
-use crate::commands::credentials::Credentials;
+use crate::credentials::Credentials;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Pipeline {

@@ -3,9 +3,9 @@ use prettytable::{format, row, Table};
 
 use chrono::{DateTime, Utc};
 
-use crate::commands::credentials::Credentials;
-use crate::commands::pipeline::get_pipelines;
+use crate::credentials::Credentials;
 use crate::format::format_seconds;
+use crate::pipeline::get_pipelines;
 
 // Returns number of seconds since the rfc3339 timestamp
 fn seconds_ago(datetime: String) -> isize {

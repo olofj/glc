@@ -2,22 +2,21 @@ use parse_duration::parse;
 use structopt::StructOpt;
 
 mod commands {
-    pub mod credentials;
     pub mod get_artifact;
-    pub mod job;
     pub mod job_history;
     pub mod list_jobs;
     pub mod list_pipelines;
     pub mod list_projects;
     pub mod list_runners;
     pub mod login;
-    pub mod pipeline;
-    pub mod runner;
     pub mod show_job;
 }
+mod credentials;
 mod format;
+mod job;
+mod pipeline;
+mod runner;
 
-use commands::credentials::load_credentials;
 use commands::get_artifact::get_artifact;
 use commands::job_history::job_history;
 use commands::list_jobs::list_jobs;
@@ -26,6 +25,7 @@ use commands::list_projects::list_projects;
 use commands::list_runners::list_runners;
 use commands::login::login;
 use commands::show_job::show_job;
+use credentials::load_credentials;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "glc", about = "gitlab client utility")]

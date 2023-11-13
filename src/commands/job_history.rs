@@ -1,11 +1,11 @@
 use colored::*;
 use prettytable::{format, row, Cell, Row, Table};
 
-use crate::commands::credentials::Credentials;
-use crate::commands::job::find_jobs;
-use crate::commands::job::Job;
-use crate::commands::pipeline::get_pipelines;
+use crate::credentials::Credentials;
 use crate::format::{format_bytes, format_seconds};
+use crate::job::find_jobs;
+use crate::job::Job;
+use crate::pipeline::get_pipelines;
 
 pub async fn job_history(
     creds: &Credentials,

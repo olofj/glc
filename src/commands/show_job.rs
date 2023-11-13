@@ -4,9 +4,9 @@ use anyhow::Result;
 use prettytable::{format, row, table, Table};
 use reqwest::Url;
 
-use crate::commands::credentials::Credentials;
-use crate::commands::job::{find_jobs, get_job_details, Job};
+use crate::credentials::Credentials;
 use crate::format::{format_bytes, format_seconds};
+use crate::job::{find_jobs, get_job_details, Job};
 use crate::ShowJobArgs;
 
 pub async fn show_job(
