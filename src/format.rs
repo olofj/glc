@@ -8,9 +8,19 @@ pub fn format_bytes(bytes: usize) -> ColoredString {
     let terabytes = gigabytes / 1024f64;
 
     if terabytes >= 1f64 {
-        format!("{:6.2} TB", terabytes).bright_red()
-    } else if gigabytes >= 1f64 {
+        format!("{:6.2} TB", terabytes)
+            .bold()
+            .bright_white()
+            .on_red()
+    } else if gigabytes >= 5f64 {
+        format!("{:6.2} GB", gigabytes)
+            .bold()
+            .bright_white()
+            .on_red()
+    } else if gigabytes >= 2f64 {
         format!("{:6.2} GB", gigabytes).bright_red()
+    } else if gigabytes >= 1f64 {
+        format!("{:6.2} GB", gigabytes).yellow()
     } else if megabytes >= 200f64 {
         format!("{:6.1} MB", megabytes).yellow()
     } else if megabytes >= 1f64 {
