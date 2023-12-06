@@ -34,6 +34,7 @@ pub async fn list_pipelines(
         "ID",
         "Created",
         "🔄 Status",
+        "PASS / FAIL /  RUN / PEND",
         "Jobs",
         "Artifacts",
         "Elapsed",
@@ -58,7 +59,10 @@ pub async fn list_pipelines(
             "running" => "⏳ Running".yellow(),
             _ => "❓ Unknown".normal(),
         };
-        let mut elapsed = match (
+        let success = jobs.iter().filter(|j| j.status == "success").count();
+        let failed = jobs.iter().filter(|j| j.status == "failed").count();
+        let running = jobs.iter().filter(|j| j.status == "running").count();
+        let elapsed = match (
             pipeline.status.as_str(),
             pipeline.created_at.clone(),
             pipeline.updated_at.clone(),
@@ -67,10 +71,14 @@ pub async fn list_pipelines(
             (_, Some(c), Some(u)) => format_seconds((seconds_ago(c) - seconds_ago(u)) as f64),
             (_, _, _) => "-".to_string(),
         };
-        if pipeline.status == "running" {
-            elapsed.push_str("+");
-        }
         let af_size: usize = jobs.iter().map(|j| j.artifacts_size).sum();
+        let status_str = format!(
+            "{:>4} / {:>4} / {:>4} / {:>4}",
+            success,
+            failed,
+            running,
+            jobs.len() - success - failed - running
+        );
 
         let created = pipeline
             .created_at
@@ -80,6 +88,7 @@ pub async fn list_pipelines(
             &pipeline.id,
             &created,
             &status,
+            &status_str,
             &jobs.len(),
             &format_bytes(af_size),
             &elapsed,
