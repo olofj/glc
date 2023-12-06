@@ -1,47 +1,25 @@
-use prettytable::{format, row, Cell, Row, Table};
-use reqwest::Url;
-use serde_derive::Deserialize;
+use crate::runner::{get_runner_detail, get_runners, Runner};
+use colored::*;
+use prettytable::{cell, format, row, Table};
 
 use crate::credentials::Credentials;
+use anyhow::Result;
+use futures::future::try_join_all;
 
-#[derive(Deserialize, Debug)]
-struct RunnerShort {
-    id: usize,
+fn opt(s: Option<String>) -> String {
+    match s {
+        Some(s) => s,
+        None => "-".to_string()
+    }
 }
 
-#[derive(Deserialize, Debug)]
-struct RunnerDetail {
-    id: usize,
-    description: String,
-    ip_address: String,
-    active: bool,
-    is_shared: bool,
-    runner_type: Option<String>,
-    version: String,
-    tag_list: Vec<String>,
-    // Add more fields as per your requirement
-}
+pub async fn list_runners(creds: &Credentials) -> Result<()> {
+    let runners: Vec<Runner> = get_runners(creds).await?;
 
-pub async fn list_runners(creds: &Credentials) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Foo?!");
-    let url = format!("{}/api/v4/runners/all?per_page=100", creds.url);
-    println!("Foo?!");
-    let url = Url::parse(&url)?;
-
-    println!("Foo?!");
-    let client = reqwest::Client::new();
-    let response = client.get(url).bearer_auth(&creds.token).send().await?;
-
-    println!("response: {:#?}", response);
-
-    let runners: Vec<usize> = response
-        .json::<Vec<RunnerShort>>()
-        .await?
-        .into_iter()
-        .map(|r| r.id)
+    let runner_details: Vec<_> = runners
+        .iter()
+        .map(|r| get_runner_detail(&creds, &r))
         .collect();
-
-    println!("runners: {:#?}", runners);
 
     let mut table = Table::new();
 
@@ -53,48 +31,29 @@ pub async fn list_runners(creds: &Credentials) -> Result<(), Box<dyn std::error:
         "Description",
         "IP",
         "Tags",
+        "Online",
         "Active",
         "Shared",
         "Type"
     ]);
 
-    println!("{} runners", runners.len());
-
-    let responses: Vec<_> = runners
-        .into_iter()
-        .map(|r| {
-            let url = format!("{}/api/v4/runners/{}", creds.url, r);
-            let url = Url::parse(&url).unwrap();
-            let client = reqwest::Client::new();
-            let request = client.get(url).bearer_auth(&creds.token).send();
-            async move {
-                let response = request.await;
-                response
-            }
-        })
-        .collect::<Vec<_>>();
-
-    let futures = futures::future::join_all(responses);
-    let results: Vec<_> = futures.await.into_iter().filter_map(Result::ok).collect();
-
-    for r in results {
-        let raw_json = r.text().await?;
-        // Parse the raw JSON to a serde_json::Value to get all fields, even those not in RunnerDetail
-        let _v: serde_json::Value = serde_json::from_str(&raw_json)?;
-        // Print the pretty JSON
-        //println!("raw runner: {}", serde_json::to_string_pretty(&_v)?);
-        let d: RunnerDetail = serde_json::from_str(&raw_json)?;
-
-        table.add_row(Row::new(vec![
-            Cell::new(&d.id.to_string()),
-            Cell::new(&d.version),
-            Cell::new(&d.description),
-            Cell::new(&d.ip_address),
-            Cell::new(&d.tag_list.join(",")),
-            Cell::new(&d.active.to_string()),
-            Cell::new(&d.is_shared.to_string()),
-            Cell::new(&d.runner_type.unwrap_or("-".to_string())),
-        ]));
+    let runner_details = try_join_all(runner_details).await?;
+    for d in runner_details {
+        let online = match d.online {
+            Some(true) => "true".green(),
+            _ => "false".bright_red(),
+        };
+        table.add_row(row![
+            cell![&d.id.to_string()],
+            cell![&opt(d.version)],
+            cell![&d.description],
+            cell![&opt(d.ip_address)],
+            cell![&d.tag_list.join(", ")],
+            cell![&online],
+            cell![&d.active.to_string()],
+            cell![&d.is_shared.to_string()],
+            cell![&d.runner_type],
+        ]);
     }
 
     table.printstd();

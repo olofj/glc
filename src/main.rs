@@ -1,6 +1,6 @@
+use clap::{ArgAction, Parser};
 use parse_duration::parse;
 use std::io::{self, Write};
-use clap::{ArgAction, Parser};
 
 mod commands {
     pub mod get_artifact;
@@ -17,6 +17,7 @@ mod credentials;
 mod format;
 mod job;
 mod pipeline;
+mod project;
 mod runner;
 
 use commands::get_artifact::get_artifact;
@@ -231,7 +232,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             list_projects(&creds).await?;
         }
         Command::ListRunners {} => {
-            println!("list_runners");
             list_runners(&creds).await?;
         }
         Command::ListPipelines {
