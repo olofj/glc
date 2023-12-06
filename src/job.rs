@@ -8,11 +8,12 @@ use reqwest::Client;
 use reqwest::Url;
 use serde_derive::Deserialize;
 use std::io::Write;
-use std::sync::Arc;
 
 use futures::future::try_join_all;
-use std::time::Instant;
 use tokio::sync::Semaphore;
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Artifact {
@@ -103,6 +104,8 @@ async fn multifetch(
     // fetch the first page to know how many more to get
     let first_page_url = format!("{}&page=1", base_url);
 
+    //println!("Fetching {}", base_url);
+
     let _permit = sem.acquire().await.unwrap();
     //println!("fetching {}", first_page_url);
     let response = client
@@ -115,23 +118,32 @@ async fn multifetch(
     let total_pages = response
         .headers()
         .get("x-total-pages")
-        .map_or("1", |_| &"1")
-        .parse::<usize>()?;
+        .map(|v| v.to_str().unwrap_or("1")) // Convert the header value to a string, default to "1" if any error occurs
+        .unwrap_or("1") // Provide "1" as default if the header is not present
+        .parse::<usize>()
+        .unwrap_or(1);
+
+
+    let oldest_valid_page = Arc::new(AtomicUsize::new(total_pages)); // Initialize with 1, assuming the first page is always valid
+    let fetched_pages = Arc::new(AtomicUsize::new(1));
 
     let mut all_jobs_for_pipeline: Vec<Job> = response
         .json::<Vec<Job>>()
         .await?
         .into_iter()
         .filter(|j| {
+            let job_age = seconds_ago(&j.created_at.naive_utc());
+            if job_age > max_age {
+                 oldest_valid_page.store(1, Ordering::Relaxed);
+            }
             job_name.map_or(true, |name| j.name == name)
-                && seconds_ago(&j.created_at.naive_utc()) <= max_age
+                && job_age <= max_age
         })
         .collect();
 
     drop(_permit);
 
-    //println!("url {} total_pages {}", base_url, total_pages);
-    let total_pages: usize = 3;
+    //println!("url {} total_pages {} jobs from first page {}", base_url, total_pages, all_jobs_for_pipeline.len());
 
     let page_futures: Vec<_> = (2..=total_pages)
         .map(|page| {
@@ -139,38 +151,55 @@ async fn multifetch(
             let page_url = format!("{}&page={}", base_url, page);
             let credentials = credentials.clone();
             let sem = sem.clone();
+            let oldest_valid_page = oldest_valid_page.clone();
+            let fetched_pages = fetched_pages.clone();
 
             async move {
                 let _permit = sem.acquire().await.unwrap();
+                // Skip if the page is already known to be too old
+                if page > oldest_valid_page.load(Ordering::Relaxed) {
+                    //println!("Skipping page {}", page);
+                    return Ok(Vec::new()); // Return an empty vector if the page is too old
+                }
                 let response = client
                     .get(&page_url)
                     .bearer_auth(&credentials.token)
                     .send()
-                    .await.unwrap();
+                    .await
+                    .unwrap();
 
-                let text = response.text().await.map_err(Into::<anyhow::Error>::into).unwrap();
+                let text = response
+                    .text()
+                    .await
+                    .map_err(Into::<anyhow::Error>::into)
+                    .unwrap();
                 drop(_permit);
+                fetched_pages.fetch_add(1, Ordering::SeqCst);
 
                 let jobs = serde_json::from_str::<Vec<Job>>(&text);
                 let ret: Result<Vec<Job>> = match jobs {
                     Ok(jobs) => {
-                        // If successful, proceed with the jobs after filtering
-                        let mut jobs: Vec<Job> = jobs
-                            .into_iter()
-                            .filter(|j| {
-                                job_name.map_or(true, |name| j.name == name)
-                                    && seconds_ago(&j.created_at.naive_utc()) <= max_age
-                            })
-                            .collect();
+                        let mut valid_jobs = Vec::new();
+                        for job in jobs {
+                            let job_age = seconds_ago(&job.created_at.naive_utc());
+                            if job_age <= max_age {
+                                if job_name == None || Some(job.name.as_str()) == job_name {
+                                    valid_jobs.push(job);
+                                }
+                            } else {
+                                oldest_valid_page.store(page - 1, Ordering::Relaxed);
+                                break; // No need to check further jobs on this page
+                            }
+                        }
 
-                        for j in &mut jobs {
+                        for j in &mut valid_jobs {
                             j.artifacts_size = match &j.artifacts {
                                 Some(a) => a.iter().map(|a| a.size).sum(),
                                 _ => 0,
                             };
                         }
 
-                        Ok(jobs)
+                        Ok(valid_jobs)
                     }
                     Err(e) => {
                         // If there's an error, print the error and the response body
@@ -192,13 +221,7 @@ async fn multifetch(
         all_jobs_for_pipeline.extend(jobs);
     }
 
-    if all_jobs_for_pipeline.is_empty() {
-        print!(".");
-    } else {
-        print!("*");
-    }
-    std::io::stdout().flush().unwrap();
-
+    //println!("Done with {} after {}/{} pages", base_url, fetched_pages.load(Ordering::Relaxed), total_pages);
     Ok::<Vec<Job>, anyhow::Error>(all_jobs_for_pipeline)
 }
 
@@ -227,8 +250,6 @@ pub async fn find_jobs(
     let max_age = max_age.unwrap_or(std::isize::MAX);
     let semaphore = Arc::new(Semaphore::new(30));
 
-    let start_time = Instant::now();
-
     let pipelines = if pipelines.is_empty() {
         get_pipelines(credentials, project, max_age, None, None)
             .await?
@@ -247,7 +268,7 @@ pub async fn find_jobs(
         .iter()
         .map(|&pipeline_id| {
             format!(
-                "{}/api/v4/projects/{}/pipelines/{}/jobs?per_page=100{}&include_retried=Yes",
+                "{}/api/v4/projects/{}/pipelines/{}/jobs?per_page=20{}&include_retried=Yes",
                 credentials.url, project, pipeline_id, scope_arg
             )
         })
@@ -255,7 +276,7 @@ pub async fn find_jobs(
 
     let mut job_futures = Vec::new();
 
-    for base_url in base_urls.iter() {
+    for (index, base_url) in base_urls.iter().enumerate() {
         job_futures.push(multifetch(
             credentials.clone(),
             base_url,
@@ -264,20 +285,19 @@ pub async fn find_jobs(
             max_age,
         ));
     }
-    print!("Fetching jobs from pipelines: ");
     let jobs_results = try_join_all(job_futures).await?;
-    println!("");
-    println!("Request completed in: {:?}", start_time.elapsed());
 
-    let mut all_jobs = Vec::new();
+    let mut ret = Vec::new();
     for mut jobs in jobs_results {
         jobs.retain(|job| {
             job_name.map_or(true, |name| job.name == name)
                 && seconds_ago(&job.created_at.naive_utc()) <= max_age
         });
-        all_jobs.extend(jobs);
+        ret.extend(jobs);
     }
+    print!("\r{:<3} pipelines {:<4} jobs", pipelines.len(), ret.len());
+    std::io::stdout().flush().unwrap();
+    println!("");
 
-    println!("Completely completed in: {:?}", start_time.elapsed());
-    Ok(all_jobs)
+    Ok(ret)
 }

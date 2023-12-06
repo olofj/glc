@@ -86,6 +86,8 @@ pub async fn list_jobs(
 
     let total_artifacts: usize = jobs.iter().map(|j| j.artifacts_size).sum();
 
+    let nr_jobs = jobs.len();
+
     // Add a row per time
     for job in jobs.into_iter() {
         let status = match job.status.as_str() {
@@ -136,6 +138,7 @@ pub async fn list_jobs(
     // Print the table to stdout
     table.printstd();
 
+    println!("Jobs: {}", nr_jobs);
     println!(
         "Total artifacts produced: {}",
         format_bytes(total_artifacts)

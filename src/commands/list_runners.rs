@@ -31,7 +31,7 @@ pub async fn list_runners(creds: &Credentials, max_age: isize) -> Result<()> {
         "ID",
         "Version",
         "Description",
-        "Jobs",
+        "PASS / FAIL /  RUN",
         "IP",
         "Tags",
         "Online",
@@ -50,7 +50,7 @@ pub async fn list_runners(creds: &Credentials, max_age: isize) -> Result<()> {
         let success = jobs.into_iter().filter(|j| j.status == "success").count();
         let failed = jobs.into_iter().filter(|j| j.status == "failed").count();
         let running = jobs.into_iter().filter(|j| j.status == "running").count();
-        let status_str = format!("{} / {} / {}", success, failed, running);
+        let status_str = format!("{:>4} / {:>4} / {:>4}", success, failed, running);
         let online = match d.online {
             Some(true) => "true".green(),
             _ => "false".bright_red(),

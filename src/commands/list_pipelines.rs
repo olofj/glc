@@ -77,7 +77,7 @@ pub async fn list_pipelines(
             .clone()
             .map_or("-".to_string(), |created| created);
         table.add_row(row![
-            &pipeline.id.to_string(),
+            &pipeline.id,
             &created,
             &status,
             &jobs.len(),

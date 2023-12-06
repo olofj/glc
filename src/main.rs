@@ -210,7 +210,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             let max_age = parse(&max_age)?.as_secs() as isize;
             let pipelines = pipelines.unwrap_or_else(Vec::new);
-            println!("ListJobs max_age {:?}", max_age);
             list_jobs(&creds, &project, pipelines, max_age, status).await?;
         }
         Command::ShowJob(mut args) => {
@@ -245,6 +244,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             rref,
         } => {
             let max_age = parse(&max_age)?.as_secs() as isize;
+            println!("max_age {}", max_age);
             list_pipelines(&creds, &project, max_age, source, rref).await?;
         }
     }
