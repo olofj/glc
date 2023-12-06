@@ -26,7 +26,7 @@ pub async fn job_history(
         creds,
         project,
         pipelines,
-        Some(job_name),
+        Some(vec![job_name]),
         Some(max_age),
         None,
     )

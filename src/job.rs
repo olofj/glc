@@ -96,7 +96,7 @@ async fn multifetch(
     credentials: Credentials,
     base_url: &str,
     sem: &Arc<Semaphore>,
-    job_name: Option<&str>,
+    job_names: Option<Vec<&str>>,
     max_age: isize,
 ) -> Result<Vec<Job>, anyhow::Error> {
     let client = Client::new();
@@ -123,7 +123,6 @@ async fn multifetch(
         .parse::<usize>()
         .unwrap_or(1);
 
-
     let oldest_valid_page = Arc::new(AtomicUsize::new(total_pages)); // Initialize with 1, assuming the first page is always valid
     let fetched_pages = Arc::new(AtomicUsize::new(1));
 
@@ -134,9 +133,11 @@ async fn multifetch(
         .filter(|j| {
             let job_age = seconds_ago(&j.created_at.naive_utc());
             if job_age > max_age {
-                 oldest_valid_page.store(1, Ordering::Relaxed);
+                oldest_valid_page.store(1, Ordering::Relaxed);
             }
-            job_name.map_or(true, |name| j.name == name)
+            job_names
+                .as_ref()
+                .map_or(true, |names| names.contains(&j.name.as_str()))
                 && job_age <= max_age
         })
         .collect();
@@ -153,6 +154,7 @@ async fn multifetch(
             let sem = sem.clone();
             let oldest_valid_page = oldest_valid_page.clone();
             let fetched_pages = fetched_pages.clone();
+            let job_names = job_names.clone();
 
             async move {
                 let _permit = sem.acquire().await.unwrap();
@@ -165,10 +167,13 @@ async fn multifetch(
                     .get(&page_url)
                     .bearer_auth(&credentials.token)
                     .send()
-                    .await
-                    .unwrap();
+                    .await;
+                if response.is_err() {
+                    return Ok(Vec::new()); // Return empty vector if the call failed
+                }
 
                 let text = response
+                    .unwrap()
                     .text()
                     .await
                     .map_err(Into::<anyhow::Error>::into)
@@ -183,7 +188,10 @@ async fn multifetch(
                         for job in jobs {
                             let job_age = seconds_ago(&job.created_at.naive_utc());
                             if job_age <= max_age {
-                                if job_name == None || Some(job.name.as_str()) == job_name {
+                                if job_names
+                                    .as_ref()
+                                    .map_or(true, |names| names.contains(&job.name.as_str()))
+                                {
                                     valid_jobs.push(job);
                                 }
                             } else {
@@ -243,7 +251,7 @@ pub async fn find_jobs(
     credentials: &Credentials,
     project: &str,
     pipelines: Vec<usize>,
-    job_name: Option<&str>,
+    job_names: Option<Vec<&str>>,
     max_age: Option<isize>,
     status: Option<String>,
 ) -> Result<Vec<Job>, anyhow::Error> {
@@ -276,12 +284,13 @@ pub async fn find_jobs(
 
     let mut job_futures = Vec::new();
 
-    for (index, base_url) in base_urls.iter().enumerate() {
+    for (_index, base_url) in base_urls.iter().enumerate() {
+        let job_names = job_names.clone();
         job_futures.push(multifetch(
             credentials.clone(),
             base_url,
             &semaphore,
-            job_name,
+            job_names,
             max_age,
         ));
     }
@@ -290,7 +299,9 @@ pub async fn find_jobs(
     let mut ret = Vec::new();
     for mut jobs in jobs_results {
         jobs.retain(|job| {
-            job_name.map_or(true, |name| job.name == name)
+            job_names
+                .as_ref()
+                .map_or(true, |names| names.contains(&job.name.as_str()))
                 && seconds_ago(&job.created_at.naive_utc()) <= max_age
         });
         ret.extend(jobs);

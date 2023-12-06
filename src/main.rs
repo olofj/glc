@@ -162,6 +162,9 @@ pub struct ShowJobArgs {
     /// Number of lines of output to show (negative number)
     #[clap(short = 't', long = "tail")]
     tail: Option<usize>,
+    /// Show per-section stats for job
+    #[clap(short = 's', long = "stats", action = ArgAction::SetTrue)]
+    stats: bool,
     /// Show job prefix for every line of log
     #[clap(long = "prefix")]
     prefix: bool,

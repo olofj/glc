@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -37,17 +38,76 @@ pub async fn show_job(
         } else {
             log
         };
-        let skip = match args.tail {
-            Some(t) => log.lines().count().saturating_sub(t),
-            _ => 0,
-        };
-        for l in log.lines().skip(skip) {
-            let l = if args.prefix {
-                format!("{}: {}", job.name, l)
-            } else {
-                l.to_string()
+
+        if args.stats {
+            let mut starts = HashMap::new();
+
+            let mut level = 0;
+
+            let mut table = Table::new();
+            table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+            let titles = row!["Section", "Time", "Command"];
+            table.set_titles(titles);
+
+            let mut cursteps: Vec<_> = Vec::new();
+            let startidx: Vec<_> = log.match_indices("section_start:").collect();
+            let endidx: Vec<_> = log.match_indices("section_end:").collect();
+
+            for (idx, _) in itertools::merge(startidx, endidx) {
+                let sec = &log[idx..];
+                let mut f = sec.split(&[':', '\r', '\n'][..]);
+                match f.next() {
+                    Some("section_start") => {
+                        let stime = f.next().unwrap();
+                        let stime = stime.parse::<usize>().unwrap();
+                        let sstep = f.next().unwrap();
+                        let scmd = f.next().unwrap_or("none");
+                        let scmd = strip_ansi_escapes::strip_str(scmd);
+                        starts.insert(sstep.to_string(), (stime, scmd.to_string()));
+                        cursteps.push(sstep);
+                        level += 1;
+                    }
+                    Some("section_end") => {
+                        level -= 1;
+                        cursteps.pop();
+                        let stime = f.next().unwrap();
+                        let stime = stime.parse::<usize>().unwrap();
+                        let sstep = f.next().unwrap();
+                        table.add_row(row![
+                            "  ".repeat(level) + sstep,
+                            r->format_seconds((stime - starts[sstep].0) as f64),
+                            starts[sstep].1
+                        ]);
+                    }
+                    None => {
+                        while let Some(sstep) = cursteps.pop() {
+                            table.add_row(row![
+                                "  ".repeat(level) + sstep,
+                                "(running)",
+                                starts[sstep].1
+                            ]);
+                            level -= 1;
+                        }
+                    }
+                    Some(s) => {
+                        println!("Unknown section {}", s);
+                    }
+                };
+            }
+            table.printstd();
+        } else {
+            let skip = match args.tail {
+                Some(t) => log.lines().count().saturating_sub(t),
+                _ => 0,
             };
-            println!("{}", l);
+            for l in log.lines().skip(skip) {
+                let l = if args.prefix {
+                    format!("{}: {}", job.name, l)
+                } else {
+                    l.to_string()
+                };
+                println!("{}", l);
+            }
         }
     }
 
