@@ -3,6 +3,7 @@ use parse_duration::parse;
 use std::io::{self, Write};
 
 mod commands {
+    pub mod cancel_job;
     pub mod get_artifact;
     pub mod job_history;
     pub mod list_jobs;
@@ -20,6 +21,7 @@ mod pipeline;
 mod project;
 mod runner;
 
+use commands::cancel_job::cancel_job;
 use commands::get_artifact::get_artifact;
 use commands::job_history::job_history;
 use commands::list_jobs::list_jobs;
@@ -122,6 +124,25 @@ enum Command {
         #[clap(short = 'r', long = "ref")]
         rref: Option<String>,
     },
+
+    /// Cancel job
+    #[command(name = "cancel-job")]
+    CancelJob {
+        /// The ID of the job(s) to cancel
+        #[clap(conflicts_with = "pipeline", use_value_delimiter = true)]
+        jobs: Option<Vec<usize>>,
+        /// Pipeline ID to cancel job(s) for
+        #[clap(short = 'p', long = "pipeline", conflicts_with = "jobs")]
+        pipeline: Option<usize>,
+        /// Name of job(s) to cancel
+        #[clap(
+            short = 'n',
+            long = "name",
+            conflicts_with = "jobs",
+            use_value_delimiter = true
+        )]
+        names: Option<Vec<String>>,
+    },
 }
 
 #[derive(Parser, Debug)]
@@ -218,6 +239,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(1);
             }
             show_job(&creds, &project, &args).await?;
+        }
+        Command::CancelJob {
+            jobs,
+            pipeline,
+            names,
+        } => {
+            cancel_job(&creds, &project, jobs, pipeline, names).await?;
         }
         Command::GetArtifact { job, name } => {
             get_artifact(&creds, &project, job, name).await?;
