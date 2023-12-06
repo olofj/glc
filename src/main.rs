@@ -1,8 +1,6 @@
 use parse_duration::parse;
 use std::io::{self, Write};
-use structopt::StructOpt;
-
-//use gix;
+use clap::{ArgAction, Parser};
 
 mod commands {
     pub mod get_artifact;
@@ -31,123 +29,118 @@ use commands::login::login;
 use commands::show_job::show_job;
 use credentials::load_credentials;
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "glc", about = "gitlab client utility")]
+#[derive(Parser, Debug)]
+#[clap(name = "glc", about = "gitlab client utility")]
 struct Opt {
     /// The project ID
-    #[structopt(
-        short = "P",
-        long = "project",
-        env = "GITLAB_PROJECT",
-        default_value = "197"
-    )]
+    #[clap(short = 'P', long = "project", default_value = "197")]
     project: String,
 
-    #[structopt(subcommand)]
+    #[command(subcommand)]
     cmd: Command,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 enum Command {
     /// Login to GitLab
-    #[structopt(name = "login")]
+    #[command(name = "login")]
     Login {
         /// GitLab URL
-        #[structopt(short = "u", long = "url", parse(from_str))]
+        #[clap(short = 'u', long = "url")]
         url: String,
     },
 
     /// List jobs
-    #[structopt(name = "list-jobs")]
+    #[command(name = "list-jobs")]
     ListJobs {
         /// Pipeline ID to list jobs for
-        #[structopt(short = "p", long = "pipelines")]
+        #[clap(short = 'p', long = "pipelines")]
         pipelines: Option<Vec<usize>>,
         /// Max history ("1h", "10m", "4d" etc)
-        #[structopt(short = "m", default_value = "24h", long = "max-age")]
+        #[clap(short = 'm', default_value = "24h", long = "max-age")]
         max_age: String,
         /// Status ("Success", "Running", "Failed", etc)
-        #[structopt(short = "s", long = "status")]
+        #[clap(short = 's', long = "status")]
         status: Option<String>,
     },
 
     /// List projects
-    #[structopt(name = "list-projects")]
+    #[command(name = "list-projects")]
     ListProjects {},
 
     /// List runners
-    #[structopt(name = "list-runners")]
+    #[command(name = "list-runners")]
     ListRunners {},
 
     /// Show job
-    #[structopt(name = "show-job")]
+    #[command(name = "show-job")]
     ShowJob(ShowJobArgs),
 
     /// Get artifact from job
-    #[structopt(name = "get-artifact")]
+    #[command(name = "get-artifact")]
     GetArtifact {
         /// Job ID to download from
-        #[structopt(short = "j", long = "job")]
+        #[clap(short = 'j', long = "job")]
         job: usize,
         /// Artifact name
-        #[structopt(short = "n", long = "name")]
+        #[clap(short = 'n', long = "name")]
         name: String,
     },
 
     /// Show historical results for a job (by name)
-    #[structopt(name = "job-history")]
+    #[command(name = "job-history")]
     JobHistory {
         /// Job name
-        #[structopt(short = "n", long = "name")]
+        #[clap(short = 'n', long = "name")]
         name: String,
         /// Max history ("1h", "10m", "4d" etc)
-        #[structopt(short = "m", default_value = "24h", long = "max-age")]
+        #[clap(short = 'm', default_value = "24h", long = "max-age")]
         max_age: String,
         /// Source (type of pipeline)
-        #[structopt(short = "s", long = "source")]
+        #[clap(short = 's', long = "source")]
         source: Option<String>,
         /// Reference (branch)
-        #[structopt(short = "r", long = "ref")]
+        #[clap(short = 'r', long = "ref")]
         rref: Option<String>,
     },
 
     /// List pipelines
-    #[structopt(name = "list-pipelines")]
+    #[command(name = "list-pipelines")]
     ListPipelines {
         /// Max history ("1h", "10m", "4d" etc)
-        #[structopt(short = "m", default_value = "24h", long = "max-age")]
+        #[clap(short = 'm', default_value = "24h", long = "max-age")]
         max_age: String,
         /// Source (type of pipeline)
-        #[structopt(short = "s", long = "source")]
+        #[clap(short = 's', long = "source")]
         source: Option<String>,
         /// Reference (branch)
-        #[structopt(short = "r", long = "ref")]
+        #[clap(short = 'r', long = "ref")]
         rref: Option<String>,
     },
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 pub struct ShowJobArgs {
     /// The ID of the job to show
-    #[structopt(conflicts_with = "pipeline")]
+    #[clap(conflicts_with = "pipeline")]
     job: Option<usize>,
     /// Pipeline ID to show jobs for
-    #[structopt(short = "p", long = "pipeline", conflicts_with = "job")]
+    #[clap(short = 'p', long = "pipeline", conflicts_with = "job")]
     pipeline: Option<usize>,
     /// Status summary after output
-    #[structopt(long = "no-status", parse(from_flag = std::ops::Not::not))]
+    #[clap(long = "no-status", action = ArgAction::SetFalse)]
     status: bool,
     /// Follow (keep listening)
-    #[structopt(short = "f", long = "follow", requires = "job")]
+    #[clap(short = 'f', long = "follow", requires = "job")]
     _follow: Option<bool>,
     /// Number of lines of output to show (negative number)
-    #[structopt(short = "t", long = "tail")]
+    #[clap(short = 't', long = "tail")]
     tail: Option<usize>,
     /// Show job prefix for every line of log
-    #[structopt(long = "prefix")]
+    #[clap(long = "prefix")]
     prefix: bool,
     /// Remove all ANSI control characters
-    #[structopt(long = "plain")]
+    #[clap(long = "plain")]
     plain: bool,
 }
 
@@ -169,7 +162,7 @@ impl ShowJobArgs {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     let project = opt.project;
     /*
