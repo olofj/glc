@@ -59,7 +59,6 @@ pub async fn job_history(
             "created" => "🌱\u{00a0} Created".normal(),
             stat => format!("❓\u{00a0} {stat}").normal(),
         };
-        let artifact_size = job.artifacts.into_iter().map(|a| a.size).sum();
         let runner_name = if let Some(r) = job.runner {
             r.description
         } else {
@@ -70,7 +69,7 @@ pub async fn job_history(
             Cell::new(&job.pipeline.id.to_string()),
             Cell::new(&status),
             Cell::new(&job.failure_reason.unwrap_or_default()),
-            Cell::new(&format_bytes(artifact_size)),
+            Cell::new(&format_bytes(job.artifacts_size)),
             Cell::new(&job.rref),
             Cell::new(&job.pipeline.sha[0..14]),
             Cell::new(&job.pipeline.source),

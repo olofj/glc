@@ -84,10 +84,7 @@ pub async fn list_jobs(
         jobs = jobs.into_iter().rev().collect();
     }
 
-    let total_artifacts: usize = jobs
-        .iter()
-        .map(|j| j.artifacts.iter().map(|a| a.size).sum::<usize>())
-        .sum();
+    let total_artifacts: usize = jobs.iter().map(|j| j.artifacts_size).sum();
 
     // Add a row per time
     for job in jobs.into_iter() {
@@ -103,7 +100,6 @@ pub async fn list_jobs(
         } else {
             job.finished_at - job.started_at
         };
-        let artifact_size = job.artifacts.into_iter().map(|a| a.size).sum();
         let start_position = (job.started_at - min).num_seconds() as f64 * scale;
         let duration_width = duration.num_seconds() as f64 * scale;
         let duration_width = duration_width.max(1.0).min(30.0);
@@ -122,9 +118,9 @@ pub async fn list_jobs(
             &status.to_string(),
             &job.failure_reason.unwrap_or_default(),
             &job.stage,
-            &format_bytes(artifact_size).to_string(),
+            &format_bytes(job.artifacts_size),
             &job.name,
-            &job.tag_list.join(" "),
+            &job.tag_list.unwrap_or_default().join(" "),
             &runner,
             &format_seconds(job.duration.unwrap_or_default()).to_string(),
             &format_seconds(job.queued_duration.unwrap_or_default()).to_string(),

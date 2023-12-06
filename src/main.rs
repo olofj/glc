@@ -71,7 +71,11 @@ enum Command {
 
     /// List runners
     #[command(name = "list-runners")]
-    ListRunners {},
+    ListRunners {
+        /// Max history ("1h", "10m", "4d" etc)
+        #[clap(short = 'm', default_value = "24h", long = "max-age")]
+        max_age: String,
+    },
 
     /// Show job
     #[command(name = "show-job")]
@@ -231,8 +235,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Command::ListProjects {} => {
             list_projects(&creds).await?;
         }
-        Command::ListRunners {} => {
-            list_runners(&creds).await?;
+        Command::ListRunners { max_age } => {
+            let max_age = parse(&max_age)?.as_secs() as isize;
+            list_runners(&creds, max_age).await?;
         }
         Command::ListPipelines {
             max_age,

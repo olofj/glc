@@ -70,10 +70,7 @@ pub async fn list_pipelines(
         if pipeline.status == "running" {
             elapsed.push_str("+");
         }
-        let af_size: usize = jobs
-            .iter()
-            .map(|j| j.artifacts.iter().map(|a| a.size).sum::<usize>())
-            .sum();
+        let af_size: usize = jobs.iter().map(|j| j.artifacts_size).sum();
 
         let created = pipeline
             .created_at

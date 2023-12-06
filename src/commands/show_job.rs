@@ -82,12 +82,13 @@ pub async fn show_job(
 
     if args.status {
         for job in &jobs {
-            let artifact_size = job.artifacts.iter().map(|a| a.size).sum();
-            let mut artifact_table = job
-                .artifacts
-                .iter()
-                .map(|a| row!(a.filename, format_bytes(a.size)))
-                .collect::<Table>();
+            let mut artifact_table = match &job.artifacts {
+                Some(a) => a
+                    .iter()
+                    .map(|a| row!(a.filename, format_bytes(a.size)))
+                    .collect::<Table>(),
+                None => table![],
+            };
             artifact_table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
             artifact_table.set_titles(row!("filename", "size"));
 
@@ -96,7 +97,7 @@ pub async fn show_job(
                 ["Status", job.status],
                 ["Stage", job.stage],
                 ["Name", job.name],
-                ["Artifact size", format_bytes(artifact_size)],
+                ["Artifact size", format_bytes(job.artifacts_size)],
                 ["Artifacts", artifact_table],
                 ["Started at", job.started_at],
                 ["Finished at", job.finished_at],
